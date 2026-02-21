@@ -1,5 +1,5 @@
-import { json } from "@remix-run/node";
-import { useLoaderData } from "@remix-run/react";
+import { useLoaderData } from "react-router";
+import type { LoaderFunctionArgs } from "react-router";
 import { authenticate } from "../shopify.server";
 import {
   AppProvider,
@@ -14,7 +14,7 @@ import {
 import { useAppBridge } from "@shopify/app-bridge-react";
 import { useEffect } from "react";
 
-export const loader = async ({ request }) => {
+export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session } = await authenticate.admin(request);
 
   const metrics = {
@@ -24,10 +24,10 @@ export const loader = async ({ request }) => {
     premiumSubscribers: 0,
   };
 
-  return json({
+  return {
     shop: session.shop,
     metrics,
-  });
+  };
 };
 
 export default function App() {
