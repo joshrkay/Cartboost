@@ -1,11 +1,8 @@
 import type {
-  ActionFunctionArgs,
   HeadersFunction,
   LoaderFunctionArgs,
 } from "react-router";
 import { useLoaderData } from "react-router";
-import { useAppBridge } from "@shopify/app-bridge-react";
-import { useEffect } from "react";
 import { authenticate } from "../shopify.server";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import {
@@ -36,12 +33,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 export default function Index() {
   const { shop, metrics } = useLoaderData<typeof loader>();
-  const app = useAppBridge();
-
-  useEffect(() => {
-    // Signal App Bridge is ready
-    app.postMessage({ type: "APP_BRIDGE_READY" });
-  }, [app]);
 
   const handleUpgrade = (plan: string) => {
     window.open(
