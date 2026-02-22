@@ -2,7 +2,7 @@
 
 client_id = "495261362c1fd00c7345335ee5cdc74c"
 name = "cartboost"
-application_url = "https://example.com"
+application_url = "https://cartboost.vercel.app"
 embedded = true
 
 [build]
@@ -24,4 +24,4 @@ api_version = "2026-04"
 scopes = "write_products"
 
 [auth]
-redirect_urls = [ "https://example.com/api/auth" ]
+redirect_urls = [ "https://cartboost.vercel.app/auth/callback" ]
