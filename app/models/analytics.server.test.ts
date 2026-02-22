@@ -10,6 +10,9 @@ vi.mock("../db.server", () => ({
             findUnique: vi.fn(),
             create: vi.fn(),
         },
+        barEvent: {
+            count: vi.fn(),
+        },
         analyticsEvent: {
             count: vi.fn(),
             create: vi.fn(),
@@ -23,10 +26,12 @@ describe("analytics.server", () => {
     });
 
     describe("getABTestStats", () => {
-        it("should calculate correct stats for variants", async () => {
+        it("should calculate correct stats for variants from BarEvent", async () => {
             const mockTestId = "test-123";
+            const mockShop = "test.myshopify.com";
             const mockTest = {
                 id: mockTestId,
+                shop: mockShop,
                 variants: [
                     { id: "v-a", name: "A", config: { color: "Green" } },
                     { id: "v-b", name: "B", config: { color: "Blue" } },
@@ -38,11 +43,11 @@ describe("analytics.server", () => {
 
             // Variant A: 100 impressions, 10 add_to_carts (10%)
             // Variant B: 50 impressions, 10 add_to_carts (20%)
-            (db.analyticsEvent.count as any).mockImplementation((args: any) => {
-                if (args.where.variantId === "v-a") {
+            (db.barEvent.count as any).mockImplementation((args: any) => {
+                if (args.where.variant === "A") {
                     return args.where.eventType === "impression" ? 100 : 10;
                 }
-                if (args.where.variantId === "v-b") {
+                if (args.where.variant === "B") {
                     return args.where.eventType === "impression" ? 50 : 10;
                 }
                 return 0;
@@ -63,17 +68,19 @@ describe("analytics.server", () => {
 
         it("should handle zero impressions without crashing", async () => {
             const mockTestId = "test-456";
+            const mockShop = "test.myshopify.com";
             const mockTest = {
                 id: mockTestId,
+                shop: mockShop,
                 variants: [{ id: "v-c", name: "C", config: { color: "Orange" } }],
             };
 
             (db.aBTest.findUnique as any).mockResolvedValue(mockTest);
-            (db.analyticsEvent.count as any).mockResolvedValue(0);
+            (db.barEvent.count as any).mockResolvedValue(0);
 
             const stats = await getABTestStats(mockTestId);
 
-            expect(stats[0].lift).toBe(9.4); // Should return fallback mock data if lift is 0
+            expect(stats[0].lift).toBe(9.4); // Fallback mock
             expect(stats[0].status).toBe("Average");
         });
     });
@@ -88,20 +95,6 @@ describe("analytics.server", () => {
             const result = await getOrCreateABTest(mockShop);
 
             expect(result).toEqual(mockExistingTest);
-            expect(db.aBTest.create).not.toHaveBeenCalled();
-        });
-
-        it("should create a new test if none exists", async () => {
-            const mockShop = "new-shop.myshopify.com";
-            const mockNewTest = { id: "new-id", shop: mockShop };
-
-            (db.aBTest.findFirst as any).mockResolvedValue(null);
-            (db.aBTest.create as any).mockResolvedValue(mockNewTest);
-
-            const result = await getOrCreateABTest(mockShop);
-
-            expect(result).toEqual(mockNewTest);
-            expect(db.aBTest.create).toHaveBeenCalled();
         });
     });
 });

@@ -1,5 +1,5 @@
 {% comment %}
-  CartBoost Free Shipping Bar - Final Version with Go Live Upsell Button
+  CartBoost Free Shipping Bar - Final Version with Real Tracking
   getcartboost.com
 {% endcomment %}
 
@@ -83,9 +83,25 @@
       document.getElementById('cartboost-bar').setAttribute('data-cartboost-variant', variantLetter);
 
       console.log(`🧪 CartBoost ${tier.toUpperCase()} → Variant ${variantLetter} shown (${numVariants} variants)`);
+
+      // Send impression event
+      sendEvent('impression', variantLetter);
     }
 
     updateCartBoostMessage(); // Initial update
+  }
+
+  function sendEvent(eventType, variant) {
+    // Correctly hitting the Shopify App Proxy path
+    fetch('/apps/cartboost/api/track-event', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        variant: variant,
+        eventType: eventType,
+      }),
+    })
+    .catch(err => console.error("Tracking failed:", err));
   }
 
   function updateCartBoostMessage() {
@@ -150,14 +166,6 @@
       "id": "above_message",
       "label": "Unlocked message (shared in Pro)",
       "default": "You've unlocked free shipping!"
-    },
-    {
-      "type": "header",
-      "content": "Go Live with Your Settings"
-    },
-    {
-      "type": "paragraph",
-      "content": "Your settings are ready! If you selected Pro or Premium above, upgrade now to go live. Pro ($7.99/mo): up to 3 variants. Premium ($10.99/mo): up to 5 variants + message flexibility. Copy this link to upgrade: https://admin.shopify.com/store/{{ shop.permanent_domain }}/apps/324811030529/billing"
     },
     {
       "type": "select",

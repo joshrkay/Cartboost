@@ -45,11 +45,20 @@ export async function getABTestStats(testId: string): Promise<VariantStat[]> {
 
     return Promise.all(
         test.variants.map(async (v: any) => {
-            const impressions = await db.analyticsEvent.count({
-                where: { variantId: v.id, eventType: "impression" },
+            // Fetching from the new BarEvent model populated by the storefront tracking
+            const impressions = await db.barEvent.count({
+                where: {
+                    shopDomain: test.shop,
+                    variant: v.name,
+                    eventType: "impression"
+                },
             });
-            const addToCarts = await db.analyticsEvent.count({
-                where: { variantId: v.id, eventType: "add_to_cart" },
+            const addToCarts = await db.barEvent.count({
+                where: {
+                    shopDomain: test.shop,
+                    variant: v.name,
+                    eventType: "add_to_cart"
+                },
             });
 
             // Simple lift calculation (conversion rate)
@@ -68,6 +77,7 @@ export async function getABTestStats(testId: string): Promise<VariantStat[]> {
 }
 
 export async function recordEvent(shop: string, eventType: string, variantId?: string, testId?: string) {
+    // Maintaining recordEvent for internal app usage if needed
     return db.analyticsEvent.create({
         data: {
             shop,
