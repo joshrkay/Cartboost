@@ -22,7 +22,7 @@ import {
   PersonIcon,
   CartIcon,
   CheckIcon,
-  ChartLineIcon,
+  TrendUpIcon,
   ClockIcon,
 } from "@shopify/polaris-icons";
 import { useState } from "react";
@@ -73,7 +73,7 @@ export default function Index() {
         <IndexTable.Cell>{conversions.toLocaleString()}</IndexTable.Cell>
         <IndexTable.Cell>{conversionRate}%</IndexTable.Cell>
         <IndexTable.Cell>
-          <Text tone={lift > 0 ? "success" : lift < 0 ? "critical" : undefined} fontWeight="bold" as="span">
+          <Text color={lift > 0 ? "success" : lift < 0 ? "critical" : undefined} fontWeight="bold">
             {lift > 0 ? `+${lift}%` : `${lift}%`}
           </Text>
         </IndexTable.Cell>
@@ -135,10 +135,10 @@ export default function Index() {
               <BlockStack gap="200">
                 <InlineStack align="space-between">
                   <Text variant="headingSm" as="h3" tone="subdued">Avg. Conv. Rate</Text>
-                  <Icon source={ChartLineIcon} tone="subdued" />
+                  <Icon source={TrendUpIcon} tone="subdued" />
                 </InlineStack>
                 <Text variant="headingLg" as="p">{avgCR.toFixed(2)}%</Text>
-                <Text variant="bodySm" tone="subdued" as="p">Across all variants</Text>
+                <Text variant="bodySm" tone="subdued">Across all variants</Text>
               </BlockStack>
             </Card>
             <Card>
@@ -148,7 +148,7 @@ export default function Index() {
                   <Icon source={CheckIcon} tone="success" />
                 </InlineStack>
                 <Text variant="headingLg" as="p" tone="success">+{bestLift}% Lift</Text>
-                <Text variant="bodySm" tone="subdued" as="p">Variation B is leading</Text>
+                <Text variant="bodySm" tone="subdued">Variation B is leading</Text>
               </BlockStack>
             </Card>
           </div>
