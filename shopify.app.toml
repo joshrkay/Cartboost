@@ -25,3 +25,8 @@ scopes = "write_products"
 
 [auth]
 redirect_urls = [ "https://cartboost.vercel.app/auth/callback" ]
+
+[app_proxy]
+url = "https://cartboost.vercel.app"
+prefix = "apps"
+subpath = "cartboost"
