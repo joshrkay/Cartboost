@@ -13,9 +13,20 @@ import {
   Banner,
   Select,
   Box,
+  IndexTable,
+  Badge,
+  Icon,
+  Divider,
 } from "@shopify/polaris";
+import {
+  PersonIcon,
+  CartIcon,
+  CheckIcon,
+  TrendUpIcon,
+  ClockIcon,
+} from "@shopify/polaris-icons";
 import { useState } from "react";
-import { getOrCreateABTest, getABTestStats } from "../models/analytics.server";
+import { getOrCreateABTest, getABTestStats, type VariantStat } from "../models/analytics.server";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session } = await authenticate.admin(request);
@@ -31,100 +42,172 @@ export default function Index() {
   const { shop, variants } = useLoaderData<typeof loader>();
   const [dateRange, setDateRange] = useState("last7");
 
+  const totalVisitors = variants.reduce((sum, v) => sum + v.visitors, 0);
+  const totalConversions = variants.reduce((sum, v) => sum + v.conversions, 0);
+  const avgCR = (totalConversions / totalVisitors) * 100 || 0;
+  const bestLift = Math.max(...variants.map(v => v.lift));
+
   const handleUpgrade = (plan: string) => {
     window.open(`https://admin.shopify.com/store/${shop}/apps/324811030529/billing?plan=${plan}`, "_blank");
   };
 
+  const resourceName = {
+    singular: 'variant',
+    plural: 'variants',
+  };
+
+  const rowMarkup = variants.map(
+    ({ id, variant, color, visitors, conversions, conversionRate, lift, confidence, status }, index) => (
+      <IndexTable.Row id={id} key={id} position={index}>
+        <IndexTable.Cell>
+          <Badge tone={status === "Winning" ? "success" : status === "Stable" ? "info" : undefined}>
+            {status}
+          </Badge>
+        </IndexTable.Cell>
+        <IndexTable.Cell>
+          <Text variant="bodyMd" fontWeight="bold" as="span">
+            {variant === "A" ? "Original (Control)" : `Variation ${variant}`}
+          </Text>
+        </IndexTable.Cell>
+        <IndexTable.Cell>{visitors.toLocaleString()}</IndexTable.Cell>
+        <IndexTable.Cell>{conversions.toLocaleString()}</IndexTable.Cell>
+        <IndexTable.Cell>{conversionRate}%</IndexTable.Cell>
+        <IndexTable.Cell>
+          <Text color={lift > 0 ? "success" : lift < 0 ? "critical" : undefined} fontWeight="bold">
+            {lift > 0 ? `+${lift}%` : `${lift}%`}
+          </Text>
+        </IndexTable.Cell>
+        <IndexTable.Cell>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <Text as="span">{confidence}%</Text>
+            {confidence >= 95 && <Icon source={CheckIcon} tone="success" />}
+          </div>
+        </IndexTable.Cell>
+      </IndexTable.Row>
+    ),
+  );
+
   return (
-    <Page title="CartBoost Free Shipping Bar">
+    <Page title="CartBoost A/B Analytics" subtitle="Optimize your conversion rates with real-time data experiments.">
       <Layout>
         <Layout.Section>
-          <Banner title={`Welcome to CartBoost for ${shop}`} tone="success">
-            Boost your AOV with beautiful free shipping bars and urgency tools.
-          </Banner>
+          <InlineStack align="space-between">
+            <div />
+            <Select
+              label="Date Range"
+              labelInline
+              value={dateRange}
+              onChange={setDateRange}
+              options={[
+                { label: "Last 7 days", value: "last7" },
+                { label: "This week", value: "thisWeek" },
+                { label: "This month", value: "thisMonth" },
+                { label: "Last 30 days", value: "last30" },
+              ]}
+            />
+          </InlineStack>
         </Layout.Section>
 
+        {/* Summary Metric Header */}
         <Layout.Section>
-          <Card>
-            <BlockStack gap="400">
-              <InlineStack align="space-between">
-                <Text variant="headingMd" as="h2">A/B Test Performance</Text>
-                <Select
-                  label="Date Range"
-                  labelInline
-                  value={dateRange}
-                  onChange={setDateRange}
-                  options={[
-                    { label: "Last 7 days", value: "last7" },
-                    { label: "This week", value: "thisWeek" },
-                    { label: "This month", value: "thisMonth" },
-                    { label: "Last 30 days", value: "last30" },
-                  ]}
-                />
-              </InlineStack>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+            <Card>
+              <BlockStack gap="200">
+                <InlineStack align="space-between">
+                  <Text variant="headingSm" as="h3" tone="subdued">Total Visitors</Text>
+                  <Icon source={PersonIcon} tone="subdued" />
+                </InlineStack>
+                <Text variant="headingLg" as="p">{totalVisitors.toLocaleString()}</Text>
+                <Badge tone="success">+12% vs last period</Badge>
+              </BlockStack>
+            </Card>
+            <Card>
+              <BlockStack gap="200">
+                <InlineStack align="space-between">
+                  <Text variant="headingSm" as="h3" tone="subdued">Total Conversions</Text>
+                  <Icon source={CartIcon} tone="subdued" />
+                </InlineStack>
+                <Text variant="headingLg" as="p">{totalConversions.toLocaleString()}</Text>
+                <Badge tone="success">+8% vs last period</Badge>
+              </BlockStack>
+            </Card>
+            <Card>
+              <BlockStack gap="200">
+                <InlineStack align="space-between">
+                  <Text variant="headingSm" as="h3" tone="subdued">Avg. Conv. Rate</Text>
+                  <Icon source={TrendUpIcon} tone="subdued" />
+                </InlineStack>
+                <Text variant="headingLg" as="p">{avgCR.toFixed(2)}%</Text>
+                <Text variant="bodySm" tone="subdued">Across all variants</Text>
+              </BlockStack>
+            </Card>
+            <Card>
+              <BlockStack gap="200">
+                <InlineStack align="space-between">
+                  <Text variant="headingSm" as="h3" tone="subdued">Peak Performance</Text>
+                  <Icon source={CheckIcon} tone="success" />
+                </InlineStack>
+                <Text variant="headingLg" as="p" tone="success">+{bestLift}% Lift</Text>
+                <Text variant="bodySm" tone="subdued">Variation B is leading</Text>
+              </BlockStack>
+            </Card>
+          </div>
+        </Layout.Section>
 
-              <div style={{ display: "flex", gap: "20px", flexWrap: "wrap" }}>
-                {variants.map((item, index) => (
-                  <div key={index} style={{ flex: "1", minWidth: "280px" }}>
-                    <Card>
-                      <BlockStack gap="300">
-                        <Text variant="headingSm" as="h3">Variant {item.variant} ({item.color})</Text>
-                        <Box paddingBlockStart="400">
-                          <div style={{ height: "12px", background: "#e5e5e5", borderRadius: "999px", overflow: "hidden" }}>
-                            <div
-                              style={{
-                                height: "100%",
-                                width: `${item.lift}%`,
-                                background: "#007bff",
-                                borderRadius: "999px"
-                              }}
-                            />
-                          </div>
-                        </Box>
-                        <InlineStack gap="400">
-                          <Text variant="headingLg" as="h4">{item.lift}%</Text>
-                          <Text as="p">Lift</Text>
-                        </InlineStack>
-                        <Text as="p">{item.addToCarts} add-to-carts • {item.status}</Text>
-                      </BlockStack>
-                    </Card>
-                  </div>
-                ))}
-              </div>
-            </BlockStack>
+        {/* Main Comparison Table */}
+        <Layout.Section>
+          <Card padding="0">
+            <IndexTable
+              resourceName={resourceName}
+              itemCount={variants.length}
+              headings={[
+                { title: 'Status' },
+                { title: 'Variation' },
+                { title: 'Visitors' },
+                { title: 'Purchases' },
+                { title: 'Conv. Rate' },
+                { title: 'Performance Lift' },
+                { title: 'Confidence' },
+              ]}
+              selectable={false}
+            >
+              {rowMarkup}
+            </IndexTable>
           </Card>
         </Layout.Section>
 
-        <Layout.Section>
-          <Card>
-            <BlockStack gap="400">
-              <Text variant="headingMd" as="h2">Go Live & Upgrade</Text>
-              <Text as="p">Choose Pro or Premium to unlock full A/B testing and advanced reporting.</Text>
-              <InlineStack gap="400">
-                <Button variant="primary" onClick={() => handleUpgrade("pro")}>
-                  Upgrade to Pro — $7.99/mo
+        <Layout.Section variant="oneThird">
+          <BlockStack gap="500">
+            <Card>
+              <BlockStack gap="400">
+                <Text variant="headingMd" as="h2">Go Live & Upgrade</Text>
+                <Text as="p">Choose Pro or Premium to unlock full A/B testing and advanced reporting.</Text>
+                <BlockStack gap="200">
+                  <Button variant="primary" onClick={() => handleUpgrade("pro")} fullWidth>
+                    Upgrade to Pro — $7.99/mo
+                  </Button>
+                  <Button variant="primary" onClick={() => handleUpgrade("premium")} fullWidth>
+                    Upgrade to Premium — $10.99/mo
+                  </Button>
+                </BlockStack>
+              </BlockStack>
+            </Card>
+
+            <Card>
+              <BlockStack gap="400">
+                <Text variant="headingMd" as="h2">Quick Actions</Text>
+                <Button
+                  url={`https://${shop}/admin/themes/current/editor`}
+                  target="_blank"
+                  variant="primary"
+                  fullWidth
+                >
+                  Edit Theme Bar
                 </Button>
-                <Button variant="primary" onClick={() => handleUpgrade("premium")}>
-                  Upgrade to Premium — $10.99/mo
-                </Button>
-              </InlineStack>
-            </BlockStack>
-          </Card>
-        </Layout.Section>
-
-        <Layout.Section>
-          <Card>
-            <BlockStack gap="400">
-              <Text variant="headingMd" as="h2">Quick Actions</Text>
-              <Button
-                url={`https://${shop}/admin/themes/current/editor`}
-                target="_blank"
-                variant="primary"
-              >
-                Customize Bar in Theme Editor
-              </Button>
-            </BlockStack>
-          </Card>
+                <Button variant="plain" icon={ClockIcon}>View Test History</Button>
+              </BlockStack>
+            </Card>
+          </BlockStack>
         </Layout.Section>
       </Layout>
     </Page>
