@@ -67,3 +67,11 @@ model AnalyticsEvent {
   createdAt   DateTime    @default(now())
 }
 
+model BarEvent {
+  id          String   @id @default(cuid())
+  shopDomain  String
+  variant     String
+  eventType   String   // "impression" or "add_to_cart"
+  timestamp   DateTime @default(now())
+  createdAt   DateTime @default(now())
+}
