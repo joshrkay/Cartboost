@@ -26,7 +26,7 @@ describe("analytics.server", () => {
     });
 
     describe("getABTestStats", () => {
-        it("should calculate correct stats for variants from BarEvent", async () => {
+        it("should calculate correct stats for variants from BarEvent with new high-fidelity interface", async () => {
             const mockTestId = "test-123";
             const mockShop = "test.myshopify.com";
             const mockTest = {
@@ -41,14 +41,14 @@ describe("analytics.server", () => {
             // Mock database responses
             (db.aBTest.findUnique as any).mockResolvedValue(mockTest);
 
-            // Variant A: 100 impressions, 10 add_to_carts (10%)
-            // Variant B: 50 impressions, 10 add_to_carts (20%)
+            // Variant A: 1000 impressions, 20 add_to_carts (2.0%) -> Stable
+            // Variant B: 1000 impressions, 50 add_to_carts (5.0%) -> Winning
             (db.barEvent.count as any).mockImplementation((args: any) => {
                 if (args.where.variant === "A") {
-                    return args.where.eventType === "impression" ? 100 : 10;
+                    return args.where.eventType === "impression" ? 1000 : 20;
                 }
                 if (args.where.variant === "B") {
-                    return args.where.eventType === "impression" ? 50 : 10;
+                    return args.where.eventType === "impression" ? 1000 : 50;
                 }
                 return 0;
             });
@@ -58,15 +58,15 @@ describe("analytics.server", () => {
             expect(stats).toHaveLength(2);
 
             const variantA = stats.find(s => s.variant === "A");
-            expect(variantA?.lift).toBe(10);
-            expect(variantA?.status).toBe("Good");
+            expect(variantA?.conversionRate).toBe(2.0);
+            expect(variantA?.status).toBe("Stable");
 
             const variantB = stats.find(s => s.variant === "B");
-            expect(variantB?.lift).toBe(20);
-            expect(variantB?.status).toBe("Best");
+            expect(variantB?.conversionRate).toBe(5.0);
+            expect(variantB?.status).toBe("Winning");
         });
 
-        it("should handle zero impressions without crashing", async () => {
+        it("should handle zero impressions without crashing and use high-fidelity fallbacks", async () => {
             const mockTestId = "test-456";
             const mockShop = "test.myshopify.com";
             const mockTest = {
@@ -80,8 +80,9 @@ describe("analytics.server", () => {
 
             const stats = await getABTestStats(mockTestId);
 
-            expect(stats[0].lift).toBe(9.4); // Fallback mock
-            expect(stats[0].status).toBe("Average");
+            expect(stats[0].conversionRate).toBe(1.62); // Fallback mock
+            expect(stats[0].lift).toBe(-9.4); // Fallback mock for Variation C
+            expect(stats[0].status).toBe("Improving");
         });
     });
 
