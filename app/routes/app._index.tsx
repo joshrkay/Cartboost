@@ -170,29 +170,41 @@ export default function Index() {
                         <Layout.Section variant="oneThird">
                                   <BlockStack gap="500">
                                               <Card>
-                                                            <BlockStack gap="400">
-                                                                            <Text variant="headingMd" as="h2">Go Live & Upgrade</Text>
-                                                                            <Text as="p">Choose Pro or Premium to unlock full A/B testing and advanced reporting.</Text>
-                                                                            <BlockStack gap="200">
-                                                                                              <Button
-                                                                                                                    variant="primary"
-                                                                                                                    onClick={() => handleUpgrade("pro")}
-                                                                                                                    loading={fetcher.state !== "idle"}
-                                                                                                                    fullWidth
-                                                                                                                  >
-                                                                                                                  Upgrade to Pro — $7.99/mo
-                                                                                                </Button>
-                                                                                              <Button
-                                                                                                                    variant="primary"
-                                                                                                                    onClick={() => handleUpgrade("premium")}
-                                                                                                                    loading={fetcher.state !== "idle"}
-                                                                                                                    fullWidth
-                                                                                                                  >
-                                                                                                                  Upgrade to Premium — $10.99/mo
-                                                                                                </Button>
-                                                                            </BlockStack>
-                                                            </BlockStack>
-                                              </Card>
+              <BlockStack gap="400">
+                <Text variant="headingMd" as="h2">
+                  {currentPlan === "free" ? "Go Live & Upgrade" : "Your Plan"}
+                </Text>
+                {currentPlan === "free" ? (
+                  <>
+                    <Text as="p">Choose Pro or Premium to unlock full A/B testing and advanced reporting.</Text>
+                    <BlockStack gap="200">
+                      <Button variant="primary" onClick={() => handleUpgrade("pro")} fullWidth>
+                        Upgrade to Pro — $7.99/mo
+                      </Button>
+                      <Button variant="primary" onClick={() => handleUpgrade("premium")} fullWidth>
+                        Upgrade to Premium — $10.99/mo
+                      </Button>
+                    </BlockStack>
+                  </>
+                ) : (
+                  <BlockStack gap="200">
+                    <Badge tone="success">
+                      {currentPlan === "premium" ? "Premium Plan — $10.99/mo" : "Pro Plan — $7.99/mo"}
+                    </Badge>
+                    <Text as="p" tone="subdued">
+                      {currentPlan === "pro"
+                        ? "Upgrade to Premium for advanced analytics and unlimited variants."
+                        : "You have access to all CartBoost features."}
+                    </Text>
+                    {currentPlan === "pro" && (
+                      <Button variant="plain" onClick={() => handleUpgrade("premium")}>
+                        Upgrade to Premium — $10.99/mo
+                      </Button>
+                    )}
+                  </BlockStack>
+                )}
+              </BlockStack>
+            </Card>
                                               <Card>
                                                             <BlockStack gap="400">
                                                                             <Text variant="headingMd" as="h2">Quick Actions</Text>
