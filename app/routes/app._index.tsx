@@ -23,7 +23,7 @@ import {
     ClockIcon,
 } from "@shopify/polaris-icons";
 import { useState } from "react";
-import { getOrCreateABTest, getABTestStats, type VariantStat } from "../models/analytics.server";
+import { getOrCreateABTest, getABTestStats, type VariantStat } from "../models/analytics.server";\nimport db from "../db.server";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
     const { session } = await authenticate.admin(request);
@@ -34,7 +34,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 };
 
 export default function Index() {
-    const { shop, variants } = useLoaderData<typeof loader>();
+    const { shop, variants, currentPlan } = useLoaderData<typeof loader>();
     const [dateRange, setDateRange] = useState("last7");
     const fetcher = useFetcher();
 
