@@ -55,28 +55,28 @@ export default function Index() {
                           <IndexTable.Cell>
                                     <Badge tone={status === "Winning" ? "success" : status === "Stable" ? "info" : undefined}>
                                       {status}
-                                    </Badge>Badge>
-                          </IndexTable.Cell>IndexTable.Cell>
+                                    </Badge>
+                          </IndexTable.Cell>
                         <IndexTable.Cell>
                                   <Text variant="bodyMd" fontWeight="bold" as="span">
                                     {variant === "A" ? "Original (Control)" : `Variation ${variant}`}
-                                  </Text>Text>
-                        </IndexTable.Cell>IndexTable.Cell>
-                        <IndexTable.Cell>{visitors.toLocaleString()}</IndexTable.Cell>IndexTable.Cell>
-                        <IndexTable.Cell>{conversions.toLocaleString()}</IndexTable.Cell>IndexTable.Cell>
-                        <IndexTable.Cell>{conversionRate}%</IndexTable.Cell>IndexTable.Cell>
+                                  </Text>
+                        </IndexTable.Cell>
+                        <IndexTable.Cell>{visitors.toLocaleString()}</IndexTable.Cell>
+                        <IndexTable.Cell>{conversions.toLocaleString()}</IndexTable.Cell>
+                        <IndexTable.Cell>{conversionRate}%</IndexTable.Cell>
                         <IndexTable.Cell>
                                   <Text tone={lift > 0 ? "success" : lift < 0 ? "critical" : undefined} fontWeight="bold" as="span">
                                     {lift > 0 ? `+${lift}%` : `${lift}%`}
-                                  </Text>Text>
-                        </IndexTable.Cell>IndexTable.Cell>
+                                  </Text>
+                        </IndexTable.Cell>
                         <IndexTable.Cell>
                                   <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                              <Text as="span">{confidence}%</Text>Text>
+                                              <Text as="span">{confidence}%</Text>
                                     {confidence >= 95 && <Icon source={CheckIcon} tone="success" />}
-                                  </div>div>
-                        </IndexTable.Cell>IndexTable.Cell>
-                </IndexTable.Row>IndexTable.Row>
+                                  </div>
+                        </IndexTable.Cell>
+                </IndexTable.Row>
               ),
       );
   
@@ -98,53 +98,53 @@ export default function Index() {
                                                                 { label: "Last 30 days", value: "last30" },
                                                                               ]}
                                                             />
-                                  </InlineStack>InlineStack>
-                        </Layout.Section>Layout.Section>
+                                  </InlineStack>
+                        </Layout.Section>
                 
                         <Layout.Section>
                                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
                                               <Card>
                                                             <BlockStack gap="200">
                                                                             <InlineStack align="space-between">
-                                                                                              <Text variant="headingSm" as="h3" tone="subdued">Total Visitors</Text>Text>
+                                                                                              <Text variant="headingSm" as="h3" tone="subdued">Total Visitors</Text>
                                                                                               <Icon source={PersonIcon} tone="subdued" />
-                                                                            </InlineStack>InlineStack>
-                                                                            <Text variant="headingLg" as="p">{totalVisitors.toLocaleString()}</Text>Text>
-                                                                            <Badge tone="success">+12% vs last period</Badge>Badge>
-                                                            </BlockStack>BlockStack>
-                                              </Card>Card>
+                                                                            </InlineStack>
+                                                                            <Text variant="headingLg" as="p">{totalVisitors.toLocaleString()}</Text>
+                                                                            <Badge tone="success">+12% vs last period</Badge>
+                                                            </BlockStack>
+                                              </Card>
                                               <Card>
                                                             <BlockStack gap="200">
                                                                             <InlineStack align="space-between">
-                                                                                              <Text variant="headingSm" as="h3" tone="subdued">Total Conversions</Text>Text>
+                                                                                              <Text variant="headingSm" as="h3" tone="subdued">Total Conversions</Text>
                                                                                               <Icon source={CartIcon} tone="subdued" />
-                                                                            </InlineStack>InlineStack>
-                                                                            <Text variant="headingLg" as="p">{totalConversions.toLocaleString()}</Text>Text>
-                                                                            <Badge tone="success">+8% vs last period</Badge>Badge>
-                                                            </BlockStack>BlockStack>
-                                              </Card>Card>
+                                                                            </InlineStack>
+                                                                            <Text variant="headingLg" as="p">{totalConversions.toLocaleString()}</Text>
+                                                                            <Badge tone="success">+8% vs last period</Badge>
+                                                            </BlockStack>
+                                              </Card>
                                               <Card>
                                                             <BlockStack gap="200">
                                                                             <InlineStack align="space-between">
-                                                                                              <Text variant="headingSm" as="h3" tone="subdued">Avg. Conv. Rate</Text>Text>
+                                                                                              <Text variant="headingSm" as="h3" tone="subdued">Avg. Conv. Rate</Text>
                                                                                               <Icon source={ChartLineIcon} tone="subdued" />
-                                                                            </InlineStack>InlineStack>
-                                                                            <Text variant="headingLg" as="p">{avgCR.toFixed(2)}%</Text>Text>
-                                                                            <Text variant="bodySm" tone="subdued" as="p">Across all variants</Text>Text>
-                                                            </BlockStack>BlockStack>
-                                              </Card>Card>
+                                                                            </InlineStack>
+                                                                            <Text variant="headingLg" as="p">{avgCR.toFixed(2)}%</Text>
+                                                                            <Text variant="bodySm" tone="subdued" as="p">Across all variants</Text>
+                                                            </BlockStack>
+                                              </Card>
                                               <Card>
                                                             <BlockStack gap="200">
                                                                             <InlineStack align="space-between">
-                                                                                              <Text variant="headingSm" as="h3" tone="subdued">Peak Performance</Text>Text>
+                                                                                              <Text variant="headingSm" as="h3" tone="subdued">Peak Performance</Text>
                                                                                               <Icon source={CheckIcon} tone="success" />
-                                                                            </InlineStack>InlineStack>
-                                                                            <Text variant="headingLg" as="p" tone="success">+{bestLift}% Lift</Text>Text>
-                                                                            <Text variant="bodySm" tone="subdued" as="p">Variation B is leading</Text>Text>
-                                                            </BlockStack>BlockStack>
-                                              </Card>Card>
-                                  </div>div>
-                        </Layout.Section>Layout.Section>
+                                                                            </InlineStack>
+                                                                            <Text variant="headingLg" as="p" tone="success">+{bestLift}% Lift</Text>
+                                                                            <Text variant="bodySm" tone="subdued" as="p">Variation B is leading</Text>
+                                                            </BlockStack>
+                                              </Card>
+                                  </div>
+                        </Layout.Section>
                 
                         <Layout.Section>
                                   <Card padding="0">
@@ -163,16 +163,16 @@ export default function Index() {
                                                               selectable={false}
                                                             >
                                                 {rowMarkup}
-                                              </IndexTable>IndexTable>
-                                  </Card>Card>
-                        </Layout.Section>Layout.Section>
+                                              </IndexTable>
+                                  </Card>
+                        </Layout.Section>
                 
                         <Layout.Section variant="oneThird">
                                   <BlockStack gap="500">
                                               <Card>
                                                             <BlockStack gap="400">
-                                                                            <Text variant="headingMd" as="h2">Go Live & Upgrade</Text>Text>
-                                                                            <Text as="p">Choose Pro or Premium to unlock full A/B testing and advanced reporting.</Text>Text>
+                                                                            <Text variant="headingMd" as="h2">Go Live & Upgrade</Text>
+                                                                            <Text as="p">Choose Pro or Premium to unlock full A/B testing and advanced reporting.</Text>
                                                                             <BlockStack gap="200">
                                                                                               <Button
                                                                                                                     variant="primary"
@@ -181,7 +181,7 @@ export default function Index() {
                                                                                                                     fullWidth
                                                                                                                   >
                                                                                                                   Upgrade to Pro — $7.99/mo
-                                                                                                </Button>Button>
+                                                                                                </Button>
                                                                                               <Button
                                                                                                                     variant="primary"
                                                                                                                     onClick={() => handleUpgrade("premium")}
@@ -189,13 +189,13 @@ export default function Index() {
                                                                                                                     fullWidth
                                                                                                                   >
                                                                                                                   Upgrade to Premium — $10.99/mo
-                                                                                                </Button>Button>
-                                                                            </BlockStack>BlockStack>
-                                                            </BlockStack>BlockStack>
-                                              </Card>Card>
+                                                                                                </Button>
+                                                                            </BlockStack>
+                                                            </BlockStack>
+                                              </Card>
                                               <Card>
                                                             <BlockStack gap="400">
-                                                                            <Text variant="headingMd" as="h2">Quick Actions</Text>Text>
+                                                                            <Text variant="headingMd" as="h2">Quick Actions</Text>
                                                                             <Button
                                                                                                 url={`https://${shop}/admin/themes/current/editor`}
                                                                                                 target="_blank"
@@ -203,14 +203,14 @@ export default function Index() {
                                                                                                 fullWidth
                                                                                               >
                                                                                               Edit Theme Bar
-                                                                            </Button>Button>
-                                                                            <Button variant="plain" icon={ClockIcon}>View Test History</Button>Button>
-                                                            </BlockStack>BlockStack>
-                                              </Card>Card>
-                                  </BlockStack>BlockStack>
-                        </Layout.Section>Layout.Section>
-                </Layout>Layout>
-          </Page>Page>
+                                                                            </Button>
+                                                                            <Button variant="plain" icon={ClockIcon}>View Test History</Button>
+                                                            </BlockStack>
+                                              </Card>
+                                  </BlockStack>
+                        </Layout.Section>
+                </Layout>
+          </Page>
         );
 }
 
