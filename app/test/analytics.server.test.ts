@@ -49,6 +49,7 @@ describe("getABTestStats", () => {
   });
   it("counts real impressions and conversions from BarEvent", async () => {
     mockDb.aBTest.findUnique.mockResolvedValue(MOCK_TEST);
+    // 2 db calls per variant (impressions, conversions) x 3 variants = 6 calls
     mockDb.barEvent.count
       .mockResolvedValueOnce(6).mockResolvedValueOnce(2)  // A: 6 impressions, 2 conversions
       .mockResolvedValueOnce(5).mockResolvedValueOnce(3)  // B: 5 impressions, 3 conversions

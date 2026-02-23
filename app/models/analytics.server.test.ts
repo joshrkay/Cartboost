@@ -1,101 +1,47 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { getABTestStats, getOrCreateABTest } from "./analytics.server";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import db from "../db.server";
-
-// Mock the db.server module
-vi.mock("../db.server", () => ({
-    default: {
-        aBTest: {
-            findFirst: vi.fn(),
-            findUnique: vi.fn(),
-            create: vi.fn(),
-        },
-        barEvent: {
-            count: vi.fn(),
-        },
-        analyticsEvent: {
-            count: vi.fn(),
-            create: vi.fn(),
-        },
-    },
-}));
-
+import { getOrCreateABTest, getABTestStats } from "./analytics.server";
+const mockDb = db as any;
+const mockTestId = "test-id-123";
+const MOCK_TEST = {
+  id: mockTestId,
+  shop: "test-shop.myshopify.com",
+  name: "Initial Free Shipping Bar Test",
+  variants: [
+    { id: "v-a", name: "A", config: { color: "#4CAF50", text: "Free shipping over $50" } },
+    { id: "v-b", name: "B", config: { color: "#2196F3", text: "Limited Time: Free Shipping!" } },
+    { id: "v-c", name: "C", config: { color: "#FF9800", text: "Get Free Shipping Today" } },
+  ],
+};
 describe("analytics.server", () => {
-    beforeEach(() => {
-        vi.clearAllMocks();
-    });
-
-    describe("getABTestStats", () => {
-        it("should calculate correct stats for variants from BarEvent with new high-fidelity interface", async () => {
-            const mockTestId = "test-123";
-            const mockShop = "test.myshopify.com";
-            const mockTest = {
-                id: mockTestId,
-                shop: mockShop,
-                variants: [
-                    { id: "v-a", name: "A", config: { color: "Green" } },
-                    { id: "v-b", name: "B", config: { color: "Blue" } },
-                ],
-            };
-
-            // Mock database responses
-            (db.aBTest.findUnique as any).mockResolvedValue(mockTest);
-
-            // Variant A: 1000 impressions, 20 add_to_carts (2.0%) -> Stable
-            // Variant B: 1000 impressions, 50 add_to_carts (5.0%) -> Winning
-            (db.barEvent.count as any).mockImplementation((args: any) => {
-                if (args.where.variant === "A") {
-                    return args.where.eventType === "impression" ? 1000 : 20;
-                }
-                if (args.where.variant === "B") {
-                    return args.where.eventType === "impression" ? 1000 : 50;
-                }
-                return 0;
-            });
-
-            const stats = await getABTestStats(mockTestId);
-
-            expect(stats).toHaveLength(2);
-
-            const variantA = stats.find(s => s.variant === "A");
-            expect(variantA?.conversionRate).toBe(2.0);
-            expect(variantA?.status).toBe("Stable");
-
-            const variantB = stats.find(s => s.variant === "B");
-            expect(variantB?.conversionRate).toBe(5.0);
-            expect(variantB?.status).toBe("Winning");
-        });
-
-        it("should handle zero impressions without crashing and use high-fidelity fallbacks", async () => {
-            const mockTestId = "test-456";
-            const mockShop = "test.myshopify.com";
-            const mockTest = {
-                id: mockTestId,
-                shop: mockShop,
-                variants: [{ id: "v-c", name: "C", config: { color: "Orange" } }],
-            };
-
-            (db.aBTest.findUnique as any).mockResolvedValue(mockTest);
-            (db.barEvent.count as any).mockResolvedValue(0);
-
-            const stats = await getABTestStats(mockTestId);
-
-            expect(stats[0].conversionRate).toBe(1.62); // Fallback mock
-            expect(stats[0].lift).toBe(-9.4); // Fallback mock for Variation C
-            expect(stats[0].status).toBe("Improving");
-        });
-    });
-
-    describe("getOrCreateABTest", () => {
-        it("should return existing test if it exists", async () => {
-            const mockShop = "test.myshopify.com";
-            const mockExistingTest = { id: "existing-id", shop: mockShop };
-
-            (db.aBTest.findFirst as any).mockResolvedValue(mockExistingTest);
-
-            const result = await getOrCreateABTest(mockShop);
-
-            expect(result).toEqual(mockExistingTest);
-        });
-    });
+  beforeEach(() => vi.clearAllMocks());
+  it("should return existing test if it exists", async () => {
+    mockDb.aBTest.findFirst.mockResolvedValue(MOCK_TEST);
+    const result = await getOrCreateABTest("test-shop.myshopify.com");
+    expect(result).toEqual(MOCK_TEST);
+    expect(mockDb.aBTest.create).not.toHaveBeenCalled();
+  });
+  it("should calculate correct stats for variants from BarEvent with real data", async () => {
+    mockDb.aBTest.findUnique.mockResolvedValue(MOCK_TEST);
+    // 2 calls per variant: impressions + conversions
+    mockDb.barEvent.count
+      .mockResolvedValueOnce(6).mockResolvedValueOnce(2)   // A
+      .mockResolvedValueOnce(5).mockResolvedValueOnce(3)   // B
+      .mockResolvedValueOnce(3).mockResolvedValueOnce(1);  // C
+    const stats = await getABTestStats(mockTestId);
+    expect(stats[0].visitors).toBe(6);
+    expect(stats[0].conversions).toBe(2);
+    expect(stats[0].conversionRate).toBe(33.33);
+    expect(stats[0].status).toBe("Winning");
+    expect(stats[1].visitors).toBe(5);
+    expect(stats[1].conversionRate).toBe(60);
+  });
+  it("should show zeros when no events recorded — no hardcoded fallbacks", async () => {
+    mockDb.aBTest.findUnique.mockResolvedValue(MOCK_TEST);
+    mockDb.barEvent.count.mockResolvedValue(0);
+    const stats = await getABTestStats(mockTestId);
+    expect(stats[0].conversionRate).toBe(0);
+    expect(stats[0].lift).toBe(0);
+    expect(stats[0].status).toBe("Improving");
+  });
 });
