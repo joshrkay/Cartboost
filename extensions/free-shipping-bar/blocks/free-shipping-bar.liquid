@@ -3,30 +3,26 @@
   getcartboost.com
 {% endcomment %}
 
-<div 
-  class="cartboost-free-shipping-bar" 
+<div
+  class="cartboost-free-shipping-bar"
   id="cartboost-bar"
   data-cartboost-experiment="free-shipping-bar"
   style="position: fixed; top: 0; left: 0; width: 100%; background: {{ block.settings.bar_background_color }}; color: white; text-align: center; padding: 14px 20px; font-size: 15px; z-index: 999999; box-shadow: 0 4px 12px rgba(0,0,0,0.25);">
-
   <span id="cartboost-message">Add $50 more for free shipping!</span>
-
 </div>
 
 <script>
-  // Safe JS defaults
+  // Safe JS defaults - use JSON filter to escape apostrophes and special chars
   const defaultBelow = 'Add X more for free shipping!';
-  const defaultUnlocked = "You've unlocked free shipping!";
-
-  let messageBelow = '{{ block.settings.below_message }}' || defaultBelow;
-  let messageUnlocked = '{{ block.settings.above_message }}' || defaultUnlocked;
+  const defaultUnlocked = "You\u2019ve unlocked free shipping!";
+  let messageBelow = {{ block.settings.below_message | json }} || defaultBelow;
+  let messageUnlocked = {{ block.settings.above_message | json }} || defaultUnlocked;
 
   function initCartBoostBar() {
-    const tier = '{{ block.settings.tier | default: "free" }}';
-    const numVariants = parseInt('{{ block.settings.num_variants | default: "2" }}');
-    const testMode = '{{ block.settings.ab_test_mode | default: "same_message" }}';
-
-    let bgColor = '{{ block.settings.bar_background_color }}';
+    const tier = {{ block.settings.tier | default: "free" | json }};
+    const numVariants = parseInt({{ block.settings.num_variants | default: "2" | json }});
+    const testMode = {{ block.settings.ab_test_mode | default: "same_message" | json }};
+    let bgColor = {{ block.settings.bar_background_color | json }};
     let variantLetter = 'Free';
 
     if (tier !== 'free') {
@@ -36,31 +32,31 @@
 
       if (tier === 'pro') {
         activeColors = [
-          '{{ block.settings.variant_a }}',
-          '{{ block.settings.variant_b }}',
-          '{{ block.settings.variant_c }}'
+          {{ block.settings.variant_a | json }},
+          {{ block.settings.variant_b | json }},
+          {{ block.settings.variant_c | json }}
         ].slice(0, numVariants);
       } else if (tier === 'premium') {
         activeColors = [
-          '{{ block.settings.variant_a }}',
-          '{{ block.settings.variant_b }}',
-          '{{ block.settings.variant_c }}',
-          '{{ block.settings.variant_d }}',
-          '{{ block.settings.variant_e }}'
+          {{ block.settings.variant_a | json }},
+          {{ block.settings.variant_b | json }},
+          {{ block.settings.variant_c | json }},
+          {{ block.settings.variant_d | json }},
+          {{ block.settings.variant_e | json }}
         ].slice(0, numVariants);
         activeBelow = [
-          '{{ block.settings.variant_a_below }}',
-          '{{ block.settings.variant_b_below }}',
-          '{{ block.settings.variant_c_below }}',
-          '{{ block.settings.variant_d_below }}',
-          '{{ block.settings.variant_e_below }}'
+          {{ block.settings.variant_a_below | json }},
+          {{ block.settings.variant_b_below | json }},
+          {{ block.settings.variant_c_below | json }},
+          {{ block.settings.variant_d_below | json }},
+          {{ block.settings.variant_e_below | json }}
         ].slice(0, numVariants);
         activeUnlocked = [
-          '{{ block.settings.variant_a_unlocked }}',
-          '{{ block.settings.variant_b_unlocked }}',
-          '{{ block.settings.variant_c_unlocked }}',
-          '{{ block.settings.variant_d_unlocked }}',
-          '{{ block.settings.variant_e_unlocked }}'
+          {{ block.settings.variant_a_unlocked | json }},
+          {{ block.settings.variant_b_unlocked | json }},
+          {{ block.settings.variant_c_unlocked | json }},
+          {{ block.settings.variant_d_unlocked | json }},
+          {{ block.settings.variant_e_unlocked | json }}
         ].slice(0, numVariants);
       }
 
@@ -81,18 +77,19 @@
 
       document.getElementById('cartboost-bar').style.background = bgColor;
       document.getElementById('cartboost-bar').setAttribute('data-cartboost-variant', variantLetter);
-
-      console.log(`🧪 CartBoost ${tier.toUpperCase()} → Variant ${variantLetter} shown (${numVariants} variants)`);
+      console.log('CartBoost ' + tier.toUpperCase() + ' Variant ' + variantLetter + ' shown (' + numVariants + ' variants)');
 
       // Send impression event
       sendEvent('impression', variantLetter);
+    } else {
+      // Free tier - still send impression with 'Free' variant
+      sendEvent('impression', 'Free');
     }
 
-    updateCartBoostMessage(); // Initial update
+    updateCartBoostMessage();
   }
 
   function sendEvent(eventType, variant) {
-    // Correctly hitting the Shopify App Proxy path
     fetch('/apps/cartboost/api/track-event', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -100,18 +97,16 @@
         variant: variant,
         eventType: eventType,
       }),
-    })
-    .catch(err => console.error("Tracking failed:", err));
+    }).catch(function(err) { console.error('Tracking failed:', err); });
   }
 
   function updateCartBoostMessage() {
     fetch('/cart.js', { cache: 'default' })
-      .then(r => r.json())
-      .then(cart => {
+      .then(function(r) { return r.json(); })
+      .then(function(cart) {
         const subtotal = cart.total_price / 100;
         const threshold = {{ block.settings.threshold | default: 50 }};
         const msgEl = document.getElementById('cartboost-message');
-
         if (subtotal >= threshold) {
           msgEl.textContent = messageUnlocked;
         } else {
@@ -190,96 +185,21 @@
       ],
       "default": "2"
     },
-    {
-      "type": "color",
-      "id": "variant_a",
-      "label": "Variant A background color",
-      "default": "#1a1a1a"
-    },
-    {
-      "type": "color",
-      "id": "variant_b",
-      "label": "Variant B background color",
-      "default": "#2c2c2c"
-    },
-    {
-      "type": "color",
-      "id": "variant_c",
-      "label": "Variant C background color",
-      "default": "#3a3a3a"
-    },
-    {
-      "type": "color",
-      "id": "variant_d",
-      "label": "Variant D background color",
-      "default": "#4a4a4a"
-    },
-    {
-      "type": "color",
-      "id": "variant_e",
-      "label": "Variant E background color",
-      "default": "#5a5a5a"
-    },
-    {
-      "type": "textarea",
-      "id": "variant_a_below",
-      "label": "Variant A below threshold message (Premium only)",
-      "default": "Add X more for free shipping!"
-    },
-    {
-      "type": "textarea",
-      "id": "variant_a_unlocked",
-      "label": "Variant A unlocked message (Premium only)",
-      "default": "You've unlocked free shipping!"
-    },
-    {
-      "type": "textarea",
-      "id": "variant_b_below",
-      "label": "Variant B below threshold message (Premium only)",
-      "default": "Only X away from free shipping!"
-    },
-    {
-      "type": "textarea",
-      "id": "variant_b_unlocked",
-      "label": "Variant B unlocked message (Premium only)",
-      "default": "Free shipping unlocked! 🚀"
-    },
-    {
-      "type": "textarea",
-      "id": "variant_c_below",
-      "label": "Variant C below threshold message (Premium only)",
-      "default": "Add X more for free shipping!"
-    },
-    {
-      "type": "textarea",
-      "id": "variant_c_unlocked",
-      "label": "Variant C unlocked message (Premium only)",
-      "default": "You've unlocked free shipping!"
-    },
-    {
-      "type": "textarea",
-      "id": "variant_d_below",
-      "label": "Variant D below threshold message (Premium only)",
-      "default": "Add X more for free shipping!"
-    },
-    {
-      "type": "textarea",
-      "id": "variant_d_unlocked",
-      "label": "Variant D unlocked message (Premium only)",
-      "default": "You've unlocked free shipping!"
-    },
-    {
-      "type": "textarea",
-      "id": "variant_e_below",
-      "label": "Variant E below threshold message (Premium only)",
-      "default": "Add X more for free shipping!"
-    },
-    {
-      "type": "textarea",
-      "id": "variant_e_unlocked",
-      "label": "Variant E unlocked message (Premium only)",
-      "default": "You've unlocked free shipping!"
-    }
+    { "type": "color", "id": "variant_a", "label": "Variant A background color", "default": "#1a1a1a" },
+    { "type": "color", "id": "variant_b", "label": "Variant B background color", "default": "#2c2c2c" },
+    { "type": "color", "id": "variant_c", "label": "Variant C background color", "default": "#3a3a3a" },
+    { "type": "color", "id": "variant_d", "label": "Variant D background color", "default": "#4a4a4a" },
+    { "type": "color", "id": "variant_e", "label": "Variant E background color", "default": "#5a5a5a" },
+    { "type": "textarea", "id": "variant_a_below", "label": "Variant A below threshold message (Premium only)", "default": "Add X more for free shipping!" },
+    { "type": "textarea", "id": "variant_a_unlocked", "label": "Variant A unlocked message (Premium only)", "default": "You've unlocked free shipping!" },
+    { "type": "textarea", "id": "variant_b_below", "label": "Variant B below threshold message (Premium only)", "default": "Only X away from free shipping!" },
+    { "type": "textarea", "id": "variant_b_unlocked", "label": "Variant B unlocked message (Premium only)", "default": "Free shipping unlocked!" },
+    { "type": "textarea", "id": "variant_c_below", "label": "Variant C below threshold message (Premium only)", "default": "Add X more for free shipping!" },
+    { "type": "textarea", "id": "variant_c_unlocked", "label": "Variant C unlocked message (Premium only)", "default": "You've unlocked free shipping!" },
+    { "type": "textarea", "id": "variant_d_below", "label": "Variant D below threshold message (Premium only)", "default": "Add X more for free shipping!" },
+    { "type": "textarea", "id": "variant_d_unlocked", "label": "Variant D unlocked message (Premium only)", "default": "You've unlocked free shipping!" },
+    { "type": "textarea", "id": "variant_e_below", "label": "Variant E below threshold message (Premium only)", "default": "Add X more for free shipping!" },
+    { "type": "textarea", "id": "variant_e_unlocked", "label": "Variant E unlocked message (Premium only)", "default": "You've unlocked free shipping!" }
   ]
 }
 {% endschema %}
