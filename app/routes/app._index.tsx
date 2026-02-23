@@ -216,4 +216,4 @@ export default function Index() {
 
 export const headers: HeadersFunction = (headersArgs) => {
     return boundary.headers(headersArgs);
-};</IndexTable.Cell>
+};
