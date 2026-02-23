@@ -12,6 +12,14 @@ const MOCK_TEST = {
     { id: "v-c", name: "C", config: { color: "#FF9800", text: "Get Free Shipping Today" } },
   ],
 };
+
+function makeCountMock(data: Record<string, Record<string, number>>) {
+  return ({ where }: any) => {
+    const variant = where?.variant;
+    const eventType = where?.eventType?.in ? "conversion" : where?.eventType;
+    return Promise.resolve(data?.[variant]?.[eventType] ?? 0);
+  };
+}
 describe("getOrCreateABTest", () => {
   beforeEach(() => vi.clearAllMocks());
   it("returns existing test if one exists for the shop", async () => {
@@ -49,11 +57,13 @@ describe("getABTestStats", () => {
   });
   it("counts real impressions and conversions from BarEvent", async () => {
     mockDb.aBTest.findUnique.mockResolvedValue(MOCK_TEST);
-    // 2 db calls per variant (impressions, conversions) x 3 variants = 6 calls
-    mockDb.barEvent.count
-      .mockResolvedValueOnce(6).mockResolvedValueOnce(2)  // A: 6 impressions, 2 conversions
-      .mockResolvedValueOnce(5).mockResolvedValueOnce(3)  // B: 5 impressions, 3 conversions
-      .mockResolvedValueOnce(0).mockResolvedValueOnce(0); // C: 0/0
+    mockDb.barEvent.count.mockImplementation(
+      makeCountMock({
+        A: { impression: 6, conversion: 2 },
+        B: { impression: 5, conversion: 3 },
+        C: { impression: 0, conversion: 0 },
+      })
+    );
     const result = await getABTestStats("test-id-123");
     const varA = result.find(v => v.variant === "A")!;
     const varB = result.find(v => v.variant === "B")!;
@@ -88,10 +98,13 @@ describe("getABTestStats", () => {
   });
   it("status is Winning when conversion rate >= 4%", async () => {
     mockDb.aBTest.findUnique.mockResolvedValue(MOCK_TEST);
-    mockDb.barEvent.count
-      .mockResolvedValueOnce(10).mockResolvedValueOnce(5)
-      .mockResolvedValueOnce(10).mockResolvedValueOnce(5)
-      .mockResolvedValueOnce(10).mockResolvedValueOnce(5);
+    mockDb.barEvent.count.mockImplementation(
+      makeCountMock({
+        A: { impression: 10, conversion: 5 },
+        B: { impression: 10, conversion: 5 },
+        C: { impression: 10, conversion: 5 },
+      })
+    );
     const result = await getABTestStats("test-id-123");
     result.forEach(v => expect(v.status).toBe("Winning"));
   });

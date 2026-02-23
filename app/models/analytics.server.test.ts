@@ -13,6 +13,14 @@ const MOCK_TEST = {
     { id: "v-c", name: "C", config: { color: "#FF9800", text: "Get Free Shipping Today" } },
   ],
 };
+
+function makeCountMock(data: Record<string, Record<string, number>>) {
+  return ({ where }: any) => {
+    const variant = where?.variant;
+    const eventType = where?.eventType?.in ? "conversion" : where?.eventType;
+    return Promise.resolve(data?.[variant]?.[eventType] ?? 0);
+  };
+}
 describe("analytics.server", () => {
   beforeEach(() => vi.clearAllMocks());
   it("should return existing test if it exists", async () => {
@@ -23,11 +31,13 @@ describe("analytics.server", () => {
   });
   it("should calculate correct stats for variants from BarEvent with real data", async () => {
     mockDb.aBTest.findUnique.mockResolvedValue(MOCK_TEST);
-    // 2 calls per variant: impressions + conversions
-    mockDb.barEvent.count
-      .mockResolvedValueOnce(6).mockResolvedValueOnce(2)   // A
-      .mockResolvedValueOnce(5).mockResolvedValueOnce(3)   // B
-      .mockResolvedValueOnce(3).mockResolvedValueOnce(1);  // C
+    mockDb.barEvent.count.mockImplementation(
+      makeCountMock({
+        A: { impression: 6, conversion: 2 },
+        B: { impression: 5, conversion: 3 },
+        C: { impression: 3, conversion: 1 },
+      })
+    );
     const stats = await getABTestStats(mockTestId);
     expect(stats[0].visitors).toBe(6);
     expect(stats[0].conversions).toBe(2);

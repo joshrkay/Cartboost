@@ -75,3 +75,10 @@ model BarEvent {
   timestamp   DateTime @default(now())
   createdAt   DateTime @default(now())
 }
+
+model ShopPlan {
+  id        String   @id @default(cuid())
+  shop      String   @unique
+  plan      String   @default("free") // "free", "pro", "premium"
+  updatedAt DateTime @updatedAt
+}
