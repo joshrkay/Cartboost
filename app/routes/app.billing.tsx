@@ -1,23 +1,19 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
-import { redirect, json } from "react-router";
+import { redirect } from "react-router";
 import { authenticate, PLANS } from "../shopify.server";
-export const action = async ({ request }: ActionFunctionArgs) => {
-  const { billing, session } = await authenticate.admin(request);
-  const formData = await request.formData();
-  const plan = formData.get("plan") as string;
+export const loader = async ({ request }: LoaderFunctionArgs) => {
+  const { billing } = await authenticate.admin(request);
+  const url = new URL(request.url);
+  const plan = url.searchParams.get("plan");
   const planName = plan === "pro" ? PLANS.pro : PLANS.premium;
-  const billingCheck = await billing.require({
-    plans: [planName],
+  await billing.request({
+    plan: planName,
     isTest: true,
-    onFailure: async () => billing.request({
-      plan: planName,
-      isTest: true,
-      returnUrl: `${process.env.SHOPIFY_APP_URL}/app/billing/callback`,
-    }),
+    returnUrl: `${process.env.SHOPIFY_APP_URL}/app/billing/callback`,
   });
   return redirect("/app");
 };
-export const loader = async ({ request }: LoaderFunctionArgs) => {
+export const action = async ({ request }: ActionFunctionArgs) => {
   await authenticate.admin(request);
   return redirect("/app");
 };
