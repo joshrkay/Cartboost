@@ -23,7 +23,8 @@ import {
     ClockIcon,
 } from "@shopify/polaris-icons";
 import { useState } from "react";
-import { getOrCreateABTest, getABTestStats, type VariantStat } from "../models/analytics.server";\nimport db from "../db.server";
+import { getOrCreateABTest, getABTestStats, type VariantStat } from "../models/analytics.server";
+import db from "../db.server";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
     const { session } = await authenticate.admin(request);
