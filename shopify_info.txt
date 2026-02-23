@@ -1,0 +1,42 @@
+╭─ info ───────────────────────────────────────────────────────────────────────╮
+│                                                                              │
+│  CURRENT APP CONFIGURATION                                                   │
+│                                                                              │
+│  Configuration file  shopify.app.toml                                        │
+│  App name            cartboost                                               │
+│  Client ID           495261362c1fd00c7345335ee5cdc74c                        │
+│  Access scopes       write_products                                          │
+│  Dev store           cartboost-test-3.myshopify.com                          │
+│  Update URLs         Yes                                                     │
+│  User                joshcartboost@gmail.com                                 │
+│                                                                              │
+│  💡 To change these, run `shopify app config link`                           │
+│                                                                              │
+│                                                                              │
+│  YOUR PROJECT                                                                │
+│                                                                              │
+│  Root location  /Users/joshuakay/cartboost                                   │
+│                                                                              │
+│                                                                              │
+│  DIRECTORY COMPONENTS                                                        │
+│                                                                              │
+│  web                                                                         │
+│  📂 web                                                                      │
+│      📂 React Router  /                                                      │
+│           roles       frontend, backend                                      │
+│                                                                              │
+│  theme_app_extension                                                         │
+│  📂 free-shipping-bar  extensions/free-shipping-bar                          │
+│       config file      shopify.extension.toml                                │
+│                                                                              │
+│                                                                              │
+│  TOOLING AND SYSTEM                                                          │
+│                                                                              │
+│  Shopify CLI      3.90.1                                                     │
+│  Package manager  npm                                                        │
+│  OS               darwin-arm64                                               │
+│  Shell            /bin/zsh                                                   │
+│  Node version     v25.2.1                                                    │
+│                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯
+

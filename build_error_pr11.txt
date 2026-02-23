@@ -1,0 +1,159 @@
+
+> build
+> prisma generate && react-router build
+
+Environment variables loaded from .env
+Prisma schema loaded from prisma/schema.prisma
+
+✔ Generated Prisma Client (v6.19.2) to ./node_modules/@prisma/client in 708ms
+
+Start by importing your Prisma Client (See: https://pris.ly/d/importing-client)
+
+Tip: Want to turn off tips and other hints? https://pris.ly/tip-4-nohints
+
+vite v6.4.1 building for production...
+transforming...
+✓ 1381 modules transformed.
+✗ Build failed in 2.69s
+app/routes/app._index.tsx (25:2): "TrendUpIcon" is not exported by "node_modules/@shopify/polaris-icons/dist/index.mjs", imported by "app/routes/app._index.tsx".
+file: /Users/joshuakay/cartboost/app/routes/app._index.tsx:25:2
+
+23:   CartIcon,
+24:   CheckIcon,
+25:   TrendUpIcon,
+      ^
+26:   ClockIcon,
+27: } from "@shopify/polaris-icons";
+
+    at getRollupError (file:///Users/joshuakay/cartboost/node_modules/rollup/dist/es/shared/parseAst.js:402:41)
+    at error (file:///Users/joshuakay/cartboost/node_modules/rollup/dist/es/shared/parseAst.js:398:42)
+    at Module.error (file:///Users/joshuakay/cartboost/node_modules/rollup/dist/es/shared/node-entry.js:17040:16)
+    at Module.traceVariable (file:///Users/joshuakay/cartboost/node_modules/rollup/dist/es/shared/node-entry.js:17452:29)
+    at ModuleScope.findVariable (file:///Users/joshuakay/cartboost/node_modules/rollup/dist/es/shared/node-entry.js:15070:39)
+    at ChildScope.findVariable (file:///Users/joshuakay/cartboost/node_modules/rollup/dist/es/shared/node-entry.js:5673:38)
+    at FunctionScope.findVariable (file:///Users/joshuakay/cartboost/node_modules/rollup/dist/es/shared/node-entry.js:5673:38)
+    at FunctionBodyScope.findVariable (file:///Users/joshuakay/cartboost/node_modules/rollup/dist/es/shared/node-entry.js:5673:38)
+    at Identifier.bind (file:///Users/joshuakay/cartboost/node_modules/rollup/dist/es/shared/node-entry.js:5447:40)
+    at Property.bind (file:///Users/joshuakay/cartboost/node_modules/rollup/dist/es/shared/node-entry.js:2829:23) {
+  binding: 'TrendUpIcon',
+  code: 'MISSING_EXPORT',
+  exporter: '/Users/joshuakay/cartboost/node_modules/@shopify/polaris-icons/dist/index.mjs',
+  id: '/Users/joshuakay/cartboost/app/routes/app._index.tsx',
+  url: 'https://rollupjs.org/troubleshooting/#error-name-is-not-exported-by-module',
+  pos: 350,
+  loc: {
+    column: 2,
+    file: '/Users/joshuakay/cartboost/app/routes/app._index.tsx',
+    line: 25
+  },
+  frame: '23:   CartIcon,\n' +
+    '24:   CheckIcon,\n' +
+    '25:   TrendUpIcon,\n' +
+    '      ^\n' +
+    '26:   ClockIcon,\n' +
+    '27: } from "@shopify/polaris-icons";',
+  watchFiles: [
+    '/Users/joshuakay/cartboost/app/routes/webhooks.app.scopes_update.tsx',
+    '/Users/joshuakay/cartboost/app/routes/webhooks.app.uninstalled.tsx',
+    '/Users/joshuakay/cartboost/app/routes/api.track-event.tsx',
+    '/Users/joshuakay/cartboost/app/routes/auth.login/route.tsx',
+    '/Users/joshuakay/cartboost/app/routes/_index/route.tsx',
+    '/Users/joshuakay/cartboost/app/routes/auth.$.tsx',
+    '/Users/joshuakay/cartboost/app/routes/app.tsx',
+    '/Users/joshuakay/cartboost/app/routes/app.additional.tsx',
+    '/Users/joshuakay/cartboost/app/routes/app._index.tsx',
+    '/Users/joshuakay/cartboost/app/root.tsx',
+    '/Users/joshuakay/cartboost/node_modules/@react-router/dev/dist/config/defaults/entry.client.tsx',
+    '/Users/joshuakay/cartboost/node_modules/react/index.js',
+    '/Users/joshuakay/cartboost/node_modules/react-dom/client.js',
+    '/Users/joshuakay/cartboost/node_modules/react/jsx-runtime.js',
+    '/Users/joshuakay/cartboost/node_modules/react-router/dist/development/dom-export.mjs',
+    '/Users/joshuakay/cartboost/package.json',
+    '/Users/joshuakay/cartboost/node_modules/react/cjs/react-jsx-runtime.production.min.js',
+    '/Users/joshuakay/cartboost/node_modules/react-dom/index.js',
+    '/Users/joshuakay/cartboost/node_modules/react/cjs/react.production.min.js',
+    '/Users/joshuakay/cartboost/node_modules/react-router/dist/development/chunk-JZWAC4HX.mjs',
+    '/Users/joshuakay/cartboost/node_modules/react-router/dist/development/chunk-4LKRSAEJ.mjs',
+    '/Users/joshuakay/cartboost/node_modules/react-dom/cjs/react-dom.production.min.js',
+    '/Users/joshuakay/cartboost/app/routes/_index/styles.module.css',
+    '/Users/joshuakay/cartboost/node_modules/scheduler/index.js',
+    '/Users/joshuakay/cartboost/node_modules/scheduler/cjs/scheduler.production.min.js',
+    '/Users/joshuakay/cartboost/node_modules/react-router/dist/development/index.mjs',
+    '/Users/joshuakay/cartboost/node_modules/@shopify/shopify-app-react-router/dist/esm/server/index.mjs',
+    '/Users/joshuakay/cartboost/node_modules/@shopify/polaris/build/esm/index.js',
+    '/Users/joshuakay/cartboost/node_modules/@shopify/shopify-app-react-router/dist/esm/react/index.mjs',
+    '/Users/joshuakay/cartboost/node_modules/@shopify/polaris-icons/dist/index.mjs',
+    '/Users/joshuakay/cartboost/node_modules/set-cookie-parser/lib/set-cookie.js',
+    '/Users/joshuakay/cartboost/node_modules/react-router/node_modules/cookie/dist/index.js',
+    '/Users/joshuakay/cartboost/node_modules/@shopify/shopify-app-react-router/dist/esm/server/types.mjs',
+    '/Users/joshuakay/cartboost/node_modules/@shopify/shopify-app-react-router/dist/esm/server/boundary/index.mjs',
+    '/Users/joshuakay/cartboost/node_modules/@shopify/shopify-app-react-router/dist/esm/server/shopify-app.mjs',
+    '/Users/joshuakay/cartboost/node_modules/@shopify/shopify-api/dist/esm/runtime/index.mjs',
+    '/Users/joshuakay/cartboost/node_modules/@shopify/shopify-api/dist/esm/adapters/web-api/index.mjs',
+    '/Users/joshuakay/cartboost/node_modules/@shopify/shopify-api/dist/esm/lib/index.mjs',
+    '/Users/joshuakay/cartboost/node_modules/@shopify/shopify-app-react-router/dist/esm/server/errors.mjs',
+    '/Users/joshuakay/cartboost/node_modules/@shopify/polaris/build/esm/configure.js',
+    '/Users/joshuakay/cartboost/node_modules/@shopify/polaris/build/esm/components/shared.js',
+    '/Users/joshuakay/cartboost/node_modules/@shopify/polaris/build/esm/types.js',
+    '/Users/joshuakay/cartboost/node_modules/@shopify/polaris/build/esm/components/ThemeProvider/ThemeProvider.js',
+    '/Users/joshuakay/cartboost/node_modules/@shopify/polaris/build/esm/utilities/color-transformers.js',
+    '/Users/joshuakay/cartboost/node_modules/@shopify/polaris/build/esm/utilities/within-content-context.js',
+    '/Users/joshuakay/cartboost/node_modules/@shopify/polaris/build/esm/utilities/use-copy-to-clipboard.js',
+    '/Users/joshuakay/cartboost/node_modules/@shopify/polaris/build/esm/utilities/use-event-listener.js',
+    '/Users/joshuakay/cartboost/node_modules/@shopify/polaris/build/esm/utilities/use-focus.js',
+    '/Users/joshuakay/cartboost/node_modules/@shopify/polaris/build/esm/utilities/use-theme.js',
+    '/Users/joshuakay/cartboost/node_modules/@shopify/polaris/build/esm/utilities/use-hover.js',
+    '/Users/joshuakay/cartboost/node_modules/@shopify/polaris/build/esm/components/ActionList/ActionList.js',
+    '/Users/joshuakay/cartboost/node_modules/@shopify/polaris/build/esm/utilities/use-media-query.js',
+    '/Users/joshuakay/cartboost/node_modules/@shopify/polaris/build/esm/utilities/breakpoints.js',
+    '/Users/joshuakay/cartboost/node_modules/@shopify/polaris/build/esm/components/Avatar/Avatar.js',
+    '/Users/joshuakay/cartboost/node_modules/@shopify/polaris/build/esm/components/ActionMenu/ActionMenu.js',
+    '/Users/joshuakay/cartboost/node_modules/@shopify/polaris/build/esm/components/Autocomplete/Autocomplete.js',
+    '/Users/joshuakay/cartboost/node_modules/@shopify/polaris/build/esm/components/Backdrop/Backdrop.js',
+    '/Users/joshuakay/cartboost/node_modules/@shopify/polaris/build/esm/components/Badge/Badge.js',
+    '/Users/joshuakay/cartboost/node_modules/@shopify/polaris/build/esm/components/Badge/types.js',
+    '/Users/joshuakay/cartboost/node_modules/@shopify/polaris/build/esm/components/Box/Box.js',
+    '/Users/joshuakay/cartboost/node_modules/@shopify/polaris/build/esm/components/Bleed/Bleed.js',
+    '/Users/joshuakay/cartboost/node_modules/@shopify/polaris/build/esm/components/Banner/Banner.js',
+    '/Users/joshuakay/cartboost/node_modules/@shopify/polaris/build/esm/components/Breadcrumbs/Breadcrumbs.js',
+    '/Users/joshuakay/cartboost/node_modules/@shopify/polaris/build/esm/components/BulkActions/BulkActions.js',
+    '/Users/joshuakay/cartboost/node_modules/@shopify/polaris/build/esm/components/Button/Button.js',
+    '/Users/joshuakay/cartboost/node_modules/@shopify/polaris/build/esm/components/ButtonGroup/ButtonGroup.js',
+    '/Users/joshuakay/cartboost/node_modules/@shopify/polaris/build/esm/components/Button/utils.js',
+    '/Users/joshuakay/cartboost/node_modules/@shopify/polaris/build/esm/components/CalloutCard/CalloutCard.js',
+    '/Users/joshuakay/cartboost/node_modules/@shopify/polaris/build/esm/components/Checkbox/Checkbox.js',
+    '/Users/joshuakay/cartboost/node_modules/@shopify/polaris/build/esm/components/Card/Card.js',
+    '/Users/joshuakay/cartboost/node_modules/@shopify/polaris/build/esm/components/Collapsible/Collapsible.js',
+    '/Users/joshuakay/cartboost/node_modules/@shopify/polaris/build/esm/components/ColorPicker/ColorPicker.js',
+    '/Users/joshuakay/cartboost/node_modules/@shopify/polaris/build/esm/components/InlineGrid/InlineGrid.js',
+    '/Users/joshuakay/cartboost/node_modules/@shopify/polaris/build/esm/utilities/use-index-resource-state.js',
+    '/Users/joshuakay/cartboost/node_modules/@shopify/polaris/build/esm/components/AccountConnection/AccountConnection.js',
+    '/Users/joshuakay/cartboost/node_modules/@shopify/polaris/build/esm/components/Connected/Connected.js',
+    '/Users/joshuakay/cartboost/node_modules/@shopify/polaris/build/esm/components/Combobox/Combobox.js',
+    '/Users/joshuakay/cartboost/node_modules/@shopify/polaris/build/esm/components/DataTable/DataTable.js',
+    '/Users/joshuakay/cartboost/node_modules/@shopify/polaris/build/esm/components/DatePicker/DatePicker.js',
+    '/Users/joshuakay/cartboost/node_modules/@shopify/polaris/build/esm/components/DescriptionList/DescriptionList.js',
+    '/Users/joshuakay/cartboost/node_modules/@shopify/polaris/build/esm/components/ContextualSaveBar/ContextualSaveBar.js',
+    '/Users/joshuakay/cartboost/node_modules/@shopify/polaris/build/esm/components/EmptySearchResult/EmptySearchResult.js',
+    '/Users/joshuakay/cartboost/node_modules/@shopify/polaris/build/esm/components/Divider/Divider.js',
+    '/Users/joshuakay/cartboost/node_modules/@shopify/polaris/build/esm/components/EmptyState/EmptyState.js',
+    '/Users/joshuakay/cartboost/node_modules/@shopify/polaris/build/esm/components/EventListener/EventListener.js',
+    '/Users/joshuakay/cartboost/node_modules/@shopify/polaris/build/esm/components/Filters/Filters.js',
+    '/Users/joshuakay/cartboost/node_modules/@shopify/polaris/build/esm/components/ExceptionList/ExceptionList.js',
+    '/Users/joshuakay/cartboost/node_modules/@shopify/polaris/build/esm/components/FooterHelp/FooterHelp.js',
+    '/Users/joshuakay/cartboost/node_modules/@shopify/polaris/build/esm/components/FormLayout/FormLayout.js',
+    '/Users/joshuakay/cartboost/node_modules/@shopify/polaris/build/esm/components/Form/Form.js',
+    '/Users/joshuakay/cartboost/node_modules/@shopify/polaris/build/esm/components/Frame/components/Toast/Toast.js',
+    '/Users/joshuakay/cartboost/node_modules/@shopify/polaris/build/esm/components/Focus/Focus.js',
+    '/Users/joshuakay/cartboost/node_modules/@shopify/polaris/build/esm/components/Frame/Frame.js',
+    '/Users/joshuakay/cartboost/node_modules/@shopify/polaris/build/esm/components/FullscreenBar/FullscreenBar.js',
+    '/Users/joshuakay/cartboost/node_modules/@shopify/polaris/build/esm/components/Grid/Grid.js',
+    '/Users/joshuakay/cartboost/node_modules/@shopify/polaris/build/esm/components/Image/Image.js',
+    '/Users/joshuakay/cartboost/node_modules/@shopify/polaris/build/esm/components/IndexFilters/IndexFilters.js',
+    '/Users/joshuakay/cartboost/node_modules/@shopify/polaris/build/esm/components/Icon/Icon.js',
+    '/Users/joshuakay/cartboost/node_modules/@shopify/polaris/build/esm/components/IndexFilters/hooks/useSetIndexFiltersMode/useSetIndexFiltersMode.js',
+    '/Users/joshuakay/cartboost/node_modules/@shopify/polaris/build/esm/components/Indicator/Indicator.js',
+    ... 1250 more items
+  ],
+  Symbol(augmented): true
+}
