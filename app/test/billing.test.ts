@@ -12,15 +12,15 @@ vi.mock("../shopify.server", () => ({
 import { PLANS } from "../shopify.server";
 
 /**
- * Unit tests for the billing action logic.
+ * Unit tests for the billing loader logic.
  * Tests the plan validation and mapping without requiring Shopify auth.
  */
-function parseBillingAction(formPlan: string | null) {
-  if (formPlan !== "pro" && formPlan !== "premium") {
+function parseBillingRequest(queryPlan: string | null) {
+  if (queryPlan !== "pro" && queryPlan !== "premium") {
     return { redirect: "/app", billingRequest: null };
   }
 
-  const planName = formPlan === "pro" ? PLANS.pro : PLANS.premium;
+  const planName = queryPlan === "pro" ? PLANS.pro : PLANS.premium;
   return {
     redirect: null,
     billingRequest: {
@@ -30,35 +30,35 @@ function parseBillingAction(formPlan: string | null) {
   };
 }
 
-describe("billing action", () => {
-  it("maps 'pro' form value to the correct PLANS constant", () => {
-    const result = parseBillingAction("pro");
+describe("billing loader", () => {
+  it("maps 'pro' query param to the correct PLANS constant", () => {
+    const result = parseBillingRequest("pro");
     expect(result.billingRequest).not.toBeNull();
     expect(result.billingRequest!.plan).toBe(PLANS.pro);
     expect(result.billingRequest!.plan).toBe("CartBoost Pro");
   });
 
-  it("maps 'premium' form value to the correct PLANS constant", () => {
-    const result = parseBillingAction("premium");
+  it("maps 'premium' query param to the correct PLANS constant", () => {
+    const result = parseBillingRequest("premium");
     expect(result.billingRequest).not.toBeNull();
     expect(result.billingRequest!.plan).toBe(PLANS.premium);
     expect(result.billingRequest!.plan).toBe("CartBoost Premium");
   });
 
-  it("redirects to /app when plan is null (no form data)", () => {
-    const result = parseBillingAction(null);
+  it("redirects to /app when plan is null (missing query param)", () => {
+    const result = parseBillingRequest(null);
     expect(result.redirect).toBe("/app");
     expect(result.billingRequest).toBeNull();
   });
 
   it("redirects to /app when plan is an invalid value", () => {
-    const result = parseBillingAction("enterprise");
+    const result = parseBillingRequest("enterprise");
     expect(result.redirect).toBe("/app");
     expect(result.billingRequest).toBeNull();
   });
 
   it("redirects to /app when plan is empty string", () => {
-    const result = parseBillingAction("");
+    const result = parseBillingRequest("");
     expect(result.redirect).toBe("/app");
     expect(result.billingRequest).toBeNull();
   });
