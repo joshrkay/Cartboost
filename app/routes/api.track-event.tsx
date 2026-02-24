@@ -1,5 +1,9 @@
 import type { ActionFunctionArgs } from "react-router";
+import { authenticate } from "../shopify.server";
 import db from "../db.server";
+
+const VALID_EVENT_TYPES = ["impression", "click", "add_to_cart", "conversion"];
+const VALID_VARIANT_PATTERN = /^[A-Za-z0-9]{1,10}$/;
 
 export const action = async ({ request }: ActionFunctionArgs) => {
     if (request.method !== "POST") {
@@ -7,17 +11,25 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     }
 
     try {
-        const { variant, eventType } = await request.json();
-        const url = new URL(request.url);
-        const shopDomain = url.searchParams.get("shop");
+        const { session } = await authenticate.public.appProxy(request);
 
-        if (!shopDomain) {
-            return new Response("Missing shop parameter", { status: 400 });
+        if (!session?.shop) {
+            return new Response("Unauthorized", { status: 401 });
+        }
+
+        const { variant, eventType } = await request.json();
+
+        if (!variant || !VALID_VARIANT_PATTERN.test(variant)) {
+            return new Response("Invalid variant", { status: 400 });
+        }
+
+        if (!eventType || !VALID_EVENT_TYPES.includes(eventType)) {
+            return new Response("Invalid event type", { status: 400 });
         }
 
         await db.barEvent.create({
             data: {
-                shopDomain,
+                shopDomain: session.shop,
                 variant,
                 eventType,
             },
@@ -28,9 +40,4 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         console.error("Tracking Error:", error);
         return new Response("Internal Server Error", { status: 500 });
     }
-};
-
-// Also handle GET just in case someone hits it accidentally
-export const loader = async () => {
-    return new Response("Event tracking endpoint is active.", { status: 200 });
 };
