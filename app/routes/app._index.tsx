@@ -31,7 +31,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     const shop = session.shop;
     const test = await getOrCreateABTest(shop);
     const variants = await getABTestStats(test.id);
-    return { shop, variants };
+    const shopPlan = await db.shopPlan.findUnique({ where: { shop } });
+    const currentPlan = shopPlan?.plan ?? "free";
+    return { shop, variants, currentPlan };
 };
 
 export default function Index() {
@@ -43,6 +45,9 @@ export default function Index() {
     const totalConversions = variants.reduce((sum, v) => sum + v.conversions, 0);
     const avgCR = (totalConversions / totalVisitors) * 100 || 0;
     const bestLift = Math.max(...variants.map(v => v.lift));
+    const leadingVariant = totalVisitors > 0
+        ? variants.reduce((best, v) => (v.lift > best.lift ? v : best), variants[0])
+        : null;
 
   const handleUpgrade = (plan: string) => {
         fetcher.submit({ plan }, { method: "post", action: "/app/billing" });
@@ -111,7 +116,7 @@ export default function Index() {
                                                                                               <Icon source={PersonIcon} tone="subdued" />
                                                                             </InlineStack>
                                                                             <Text variant="headingLg" as="p">{totalVisitors.toLocaleString()}</Text>
-                                                                            <Badge tone="success">+12% vs last period</Badge>
+                                                                            <Text variant="bodySm" tone="subdued" as="p">All time</Text>
                                                             </BlockStack>
                                               </Card>
                                               <Card>
@@ -121,7 +126,7 @@ export default function Index() {
                                                                                               <Icon source={CartIcon} tone="subdued" />
                                                                             </InlineStack>
                                                                             <Text variant="headingLg" as="p">{totalConversions.toLocaleString()}</Text>
-                                                                            <Badge tone="success">+8% vs last period</Badge>
+                                                                            <Text variant="bodySm" tone="subdued" as="p">All time</Text>
                                                             </BlockStack>
                                               </Card>
                                               <Card>
@@ -141,7 +146,11 @@ export default function Index() {
                                                                                               <Icon source={CheckIcon} tone="success" />
                                                                             </InlineStack>
                                                                             <Text variant="headingLg" as="p" tone="success">+{bestLift}% Lift</Text>
-                                                                            <Text variant="bodySm" tone="subdued" as="p">Variation B is leading</Text>
+                                                                            <Text variant="bodySm" tone="subdued" as="p">
+                                                                              {leadingVariant
+                                                                                ? `Variation ${leadingVariant.variant} is leading`
+                                                                                : "No data yet"}
+                                                                            </Text>
                                                             </BlockStack>
                                               </Card>
                                   </div>
