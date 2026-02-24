@@ -1,7 +1,4 @@
 import type { MetaFunction } from "react-router";
-# 1. Create the privacy route file
-cat > app/routes/privacy.tsx << 'EOF'
-import type { MetaFunction } from "react-router";
 
 export const meta: MetaFunction = () => {
   return [{ title: "Privacy Policy - CartBoost" }];
