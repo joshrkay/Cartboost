@@ -28,8 +28,10 @@ import db from "../db.server";
 
 async function loadDashboardData(shop: string) {
     const test = await getOrCreateABTest(shop);
-    const variants = await getABTestStats(test.id);
-    const shopPlan = await db.shopPlan.findUnique({ where: { shop } });
+    const [variants, shopPlan] = await Promise.all([
+        getABTestStats(test.id),
+        db.shopPlan.findUnique({ where: { shop } }),
+    ]);
     const currentPlan = shopPlan?.plan ?? "free";
     return { variants, currentPlan };
 }
