@@ -32,6 +32,8 @@ model Session {
   emailVerified Boolean?  @default(false)
   refreshToken        String?
   refreshTokenExpires DateTime?
+
+  @@index([shop])
 }
 
 model ABTest {
@@ -42,7 +44,8 @@ model ABTest {
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
   variants    ABVariant[]
-  events      AnalyticsEvent[]
+
+  @@index([shop])
 }
 
 model ABVariant {
@@ -53,27 +56,17 @@ model ABVariant {
   config      Json        // Store bar configuration (text, color, target)
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
-  events      AnalyticsEvent[]
-}
-
-model AnalyticsEvent {
-  id          String      @id @default(cuid())
-  shop        String
-  testId      String?
-  test        ABTest?     @relation(fields: [testId], references: [id])
-  variantId   String?
-  variant     ABVariant?  @relation(fields: [variantId], references: [id])
-  eventType   String      // impression, click, add_to_cart, conversion
-  createdAt   DateTime    @default(now())
+  events      BarEvent[]
 }
 
 model BarEvent {
-  id          String   @id @default(cuid())
-  shopDomain  String
-  variant     String
-  eventType   String   // "impression" or "add_to_cart"
-  timestamp   DateTime @default(now())
-  createdAt   DateTime @default(now())
+  id          String    @id @default(cuid())
+  variantId   String
+  variant     ABVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  eventType   String    // "impression" or "add_to_cart"
+  createdAt   DateTime  @default(now())
+
+  @@index([variantId, eventType])
 }
 
 model ShopPlan {

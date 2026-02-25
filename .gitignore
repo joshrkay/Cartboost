@@ -16,8 +16,9 @@ database.sqlite
 .env
 .env.*
 
-
-
+# Build logs and artifacts
+*.log
+build_error_*.txt
 
 
 /extensions/*/dist

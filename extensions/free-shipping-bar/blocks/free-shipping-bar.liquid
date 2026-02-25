@@ -18,12 +18,14 @@
   let messageBelow = {{ block.settings.below_message | json }} || defaultBelow;
   let messageUnlocked = {{ block.settings.above_message | json }} || defaultUnlocked;
 
+  // Tracks the selected variant ID for use in subsequent events
+  let activeVariantId = null;
+
   function initCartBoostBar() {
     const tier = {{ block.settings.tier | default: "free" | json }};
     const numVariants = parseInt({{ block.settings.num_variants | default: "2" | json }});
     const testMode = {{ block.settings.ab_test_mode | default: "same_message" | json }};
     let bgColor = {{ block.settings.bar_background_color | json }};
-    let variantLetter = 'Free';
 
     if (tier !== 'free') {
       let activeColors = [];
@@ -61,7 +63,7 @@
       }
 
       const randomIndex = Math.floor(Math.random() * numVariants);
-      variantLetter = String.fromCharCode(65 + randomIndex);
+      const variantLetter = String.fromCharCode(65 + randomIndex);
 
       if (testMode === 'same_message') {
         bgColor = activeColors[randomIndex];
@@ -79,22 +81,42 @@
       document.getElementById('cartboost-bar').setAttribute('data-cartboost-variant', variantLetter);
       console.log('CartBoost ' + tier.toUpperCase() + ' Variant ' + variantLetter + ' shown (' + numVariants + ' variants)');
 
-      // Send impression event
-      sendEvent('impression', variantLetter);
+      // Fetch real variant IDs from the server, then send impression
+      fetch('/apps/cartboost/api/variants')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          var variants = data.variants || [];
+          var matched = variants.find(function(v) { return v.name === variantLetter; });
+          if (matched) {
+            activeVariantId = matched.id;
+            sendEvent('impression', activeVariantId);
+          }
+        })
+        .catch(function(err) { console.error('Failed to load variants:', err); });
     } else {
-      // Free tier - still send impression with 'Free' variant
-      sendEvent('impression', 'Free');
+      // Free tier — fetch variants and use the first one (A) for tracking
+      fetch('/apps/cartboost/api/variants')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          var variants = data.variants || [];
+          if (variants.length > 0) {
+            activeVariantId = variants[0].id;
+            sendEvent('impression', activeVariantId);
+          }
+        })
+        .catch(function(err) { console.error('Failed to load variants:', err); });
     }
 
     updateCartBoostMessage();
   }
 
-  function sendEvent(eventType, variant) {
+  function sendEvent(eventType, variantId) {
+    if (!variantId) return;
     fetch('/apps/cartboost/api/track-event', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        variant: variant,
+        variantId: variantId,
         eventType: eventType,
       }),
     }).catch(function(err) { console.error('Tracking failed:', err); });
