@@ -1,6 +1,9 @@
 {% comment %}
   CartBoost Free Shipping Bar - Final Version with Real Tracking
   getcartboost.com
+
+  Note: Plan prices in the schema labels below must be manually synced
+  with PLAN_PRICES in app/shopify.server.ts (Liquid schema is static JSON).
 {% endcomment %}
 
 <div
@@ -8,7 +11,7 @@
   id="cartboost-bar"
   data-cartboost-experiment="free-shipping-bar"
   style="position: fixed; top: 0; left: 0; width: 100%; background: {{ block.settings.bar_background_color }}; color: white; text-align: center; padding: 14px 20px; font-size: 15px; z-index: 999999; box-shadow: 0 4px 12px rgba(0,0,0,0.25);">
-  <span id="cartboost-message">Add $50 more for free shipping!</span>
+  <span id="cartboost-message">Add ${{ block.settings.threshold | default: 50 }} more for free shipping!</span>
 </div>
 
 <script>

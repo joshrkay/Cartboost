@@ -15,7 +15,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   await billing.request({
     plan: planName,
-    isTest: true,
+    isTest: process.env.NODE_ENV !== "production",
     returnUrl: `${process.env.SHOPIFY_APP_URL}/app/billing/callback`,
   });
 

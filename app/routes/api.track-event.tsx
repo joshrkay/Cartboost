@@ -10,23 +10,30 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         return new Response("Method not allowed", { status: 405 });
     }
 
+    const { session } = await authenticate.public.appProxy(request);
+
+    if (!session?.shop) {
+        return new Response("Unauthorized", { status: 401 });
+    }
+
+    let body: { variantId?: unknown; eventType?: unknown };
     try {
-        const { session } = await authenticate.public.appProxy(request);
+        body = await request.json();
+    } catch {
+        return new Response("Invalid JSON", { status: 400 });
+    }
 
-        if (!session?.shop) {
-            return new Response("Unauthorized", { status: 401 });
-        }
+    const { variantId, eventType } = body;
 
-        const { variantId, eventType } = await request.json();
+    if (typeof variantId !== "string" || !VALID_CUID_PATTERN.test(variantId)) {
+        return new Response("Invalid variantId", { status: 400 });
+    }
 
-        if (!variantId || !VALID_CUID_PATTERN.test(variantId)) {
-            return new Response("Invalid variantId", { status: 400 });
-        }
+    if (typeof eventType !== "string" || !VALID_EVENT_TYPES.includes(eventType)) {
+        return new Response("Invalid event type", { status: 400 });
+    }
 
-        if (!eventType || !VALID_EVENT_TYPES.includes(eventType)) {
-            return new Response("Invalid event type", { status: 400 });
-        }
-
+    try {
         // Verify the variant exists and belongs to this shop
         const variant = await db.aBVariant.findUnique({
             where: { id: variantId },

@@ -7,13 +7,27 @@ import {
 } from "@shopify/shopify-app-react-router/server";
 import { PrismaSessionStorage } from "@shopify/shopify-app-session-storage-prisma";
 import prisma from "./db.server";
+
+if (!process.env.SHOPIFY_API_KEY) {
+  throw new Error("SHOPIFY_API_KEY environment variable is required");
+}
+if (!process.env.SHOPIFY_API_SECRET) {
+  throw new Error("SHOPIFY_API_SECRET environment variable is required");
+}
+
 export const PLANS = {
   pro: "CartBoost Pro",
   premium: "CartBoost Premium",
 } as const;
+
+export const PLAN_PRICES = {
+  pro: { amount: 7.99, currencyCode: "USD" },
+  premium: { amount: 10.99, currencyCode: "USD" },
+} as const;
+
 const shopify = shopifyApp({
   apiKey: process.env.SHOPIFY_API_KEY,
-  apiSecretKey: process.env.SHOPIFY_API_SECRET || "",
+  apiSecretKey: process.env.SHOPIFY_API_SECRET,
   apiVersion: ApiVersion.October25,
   scopes: process.env.SCOPES?.split(","),
   appUrl: process.env.SHOPIFY_APP_URL || "",
@@ -22,14 +36,22 @@ const shopify = shopifyApp({
   distribution: AppDistribution.AppStore,
   billing: {
     [PLANS.pro]: {
-      amount: 7.99,
-      currencyCode: "USD",
-      interval: BillingInterval.Every30Days,
+      lineItems: [
+        {
+          amount: 7.99,
+          currencyCode: "USD",
+          interval: BillingInterval.Every30Days,
+        },
+      ],
     },
     [PLANS.premium]: {
-      amount: 10.99,
-      currencyCode: "USD",
-      interval: BillingInterval.Every30Days,
+      lineItems: [
+        {
+          amount: 10.99,
+          currencyCode: "USD",
+          interval: BillingInterval.Every30Days,
+        },
+      ],
     },
   },
   future: {

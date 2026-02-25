@@ -8,8 +8,15 @@ import styles from "./styles.module.css";
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const url = new URL(request.url);
 
-  if (url.searchParams.get("shop")) {
-    throw redirect(`/app?${url.searchParams.toString()}`);
+  const shop = url.searchParams.get("shop");
+  if (shop) {
+    // Only forward Shopify-standard params to prevent open redirect abuse
+    const safe = new URLSearchParams();
+    for (const key of ["shop", "host", "hmac", "timestamp", "embedded"]) {
+      const val = url.searchParams.get(key);
+      if (val) safe.set(key, val);
+    }
+    throw redirect(`/app?${safe.toString()}`);
   }
 
   return { showForm: Boolean(login) };
