@@ -25,27 +25,40 @@ import {
 import { useState } from "react";
 import { getOrCreateABTest, getABTestStats, type VariantStat } from "../models/analytics.server";
 import db from "../db.server";
+import {
+    logRequestError,
+    redirectToLoginForEmbeddedShop,
+    shouldRecoverFromResponseError,
+} from "../utils/request-debug.server";
 
-export const loader = async ({ request }: LoaderFunctionArgs) => {
-    const { session } = await authenticate.admin(request);
-    const shop = session.shop;
-
-    // Fetch plan independently so an analytics failure never downgrades a paid merchant
-    const shopPlan = await db.shopPlan.findUnique({ where: { shop } }).catch((err) => {
-        console.error("Failed to load shop plan for", shop, err);
-        return null;
-    });
-    const currentPlan = shopPlan?.plan ?? "free";
-
-    let variants: VariantStat[] = [];
+async function loadDashboardData(shop: string, request: Request) {
     try {
         const test = await getOrCreateABTest(shop);
-        variants = await getABTestStats(test.id);
+        const variants = await getABTestStats(test.id);
+        const shopPlan = await db.shopPlan.findUnique({ where: { shop } });
+        const currentPlan = shopPlan?.plan ?? "free";
+        return { variants, currentPlan };
     } catch (error) {
-        console.error("Failed to load analytics for", shop, error);
+        logRequestError("Dashboard data load failed", request, error, { shop });
+        return { variants: [], currentPlan: "free" as const };
     }
+}
 
-    return { shop, variants, currentPlan, prices: PLAN_PRICES };
+export const loader = async ({ request }: LoaderFunctionArgs) => {
+    try {
+        const { session } = await authenticate.admin(request);
+        const shop = session.shop;
+        const { variants, currentPlan } = await loadDashboardData(shop, request);
+        return { shop, variants, currentPlan, prices: PLAN_PRICES };
+    } catch (error) {
+        if (shouldRecoverFromResponseError(error) || !(error instanceof Response)) {
+            logRequestError("Dashboard loader authentication failed", request, error);
+            const loginRedirect = redirectToLoginForEmbeddedShop(request);
+            if (loginRedirect) throw loginRedirect;
+        }
+
+        throw error;
+    }
 };
 
 export default function Index() {
