@@ -1,5 +1,5 @@
 import type { LoaderFunctionArgs, HeadersFunction } from "react-router";
-import { useLoaderData, useFetcher } from "react-router";
+import { redirect, useLoaderData, useFetcher } from "react-router";
 import { authenticate, PLAN_PRICES } from "../shopify.server";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import {
@@ -26,14 +26,38 @@ import { useState } from "react";
 import { getOrCreateABTest, getABTestStats, type VariantStat } from "../models/analytics.server";
 import db from "../db.server";
 
+async function loadDashboardData(shop: string) {
+    try {
+        const test = await getOrCreateABTest(shop);
+        const variants = await getABTestStats(test.id);
+        const shopPlan = await db.shopPlan.findUnique({ where: { shop } });
+        const currentPlan = shopPlan?.plan ?? "free";
+        return { variants, currentPlan };
+    } catch (error) {
+        console.error("Dashboard data load failed", { shop, error });
+        return { variants: [], currentPlan: "free" as const };
+    }
+}
+
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-    const { session } = await authenticate.admin(request);
-    const shop = session.shop;
-    const test = await getOrCreateABTest(shop);
-    const variants = await getABTestStats(test.id);
-    const shopPlan = await db.shopPlan.findUnique({ where: { shop } });
-    const currentPlan = shopPlan?.plan ?? "free";
-    return { shop, variants, currentPlan, prices: PLAN_PRICES };
+    const url = new URL(request.url);
+
+    try {
+        const { session } = await authenticate.admin(request);
+        const shop = session.shop;
+        const { variants, currentPlan } = await loadDashboardData(shop);
+        return { shop, variants, currentPlan, prices: PLAN_PRICES };
+    } catch (error) {
+        if (error instanceof Response) throw error;
+
+        const shop = url.searchParams.get("shop");
+        if (shop) {
+            console.error("Dashboard loader authentication failed", { shop, error });
+            throw redirect(`/auth/login?shop=${encodeURIComponent(shop)}`);
+        }
+
+        throw error;
+    }
 };
 
 export default function Index() {
