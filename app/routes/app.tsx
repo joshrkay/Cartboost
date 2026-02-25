@@ -1,21 +1,22 @@
-import { Outlet, redirect, useLoaderData, useRouteError } from "react-router";
+import { Outlet, useLoaderData, useRouteError } from "react-router";
 import type { HeadersFunction, LoaderFunctionArgs } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { AppProvider } from "@shopify/shopify-app-react-router/react";
 import { authenticate } from "../shopify.server";
+import {
+  logRequestError,
+  redirectToLoginForEmbeddedShop,
+  shouldRecoverFromResponseError,
+} from "../utils/request-debug.server";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const url = new URL(request.url);
-
   try {
     await authenticate.admin(request);
   } catch (error) {
-    if (error instanceof Response) throw error;
-
-    const shop = url.searchParams.get("shop");
-    if (shop) {
-      console.error("Admin authentication failed for embedded app route", { shop, error });
-      throw redirect(`/auth/login?shop=${encodeURIComponent(shop)}`);
+    if (shouldRecoverFromResponseError(error) || !(error instanceof Response)) {
+      logRequestError("Admin authentication failed for embedded app route", request, error);
+      const loginRedirect = redirectToLoginForEmbeddedShop(request);
+      if (loginRedirect) throw loginRedirect;
     }
 
     throw error;
