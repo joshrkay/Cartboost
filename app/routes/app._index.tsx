@@ -1,5 +1,5 @@
 import type { LoaderFunctionArgs, HeadersFunction } from "react-router";
-import { useLoaderData, useNavigate } from "react-router";
+import { useLoaderData, useFetcher } from "react-router";
 import { authenticate } from "../shopify.server";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import {
@@ -39,7 +39,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 export default function Index() {
     const { shop, variants, currentPlan } = useLoaderData<typeof loader>();
     const [dateRange, setDateRange] = useState("last7");
-    const navigate = useNavigate();
+    const fetcher = useFetcher();
 
   const totalVisitors = variants.reduce((sum, v) => sum + v.visitors, 0);
     const totalConversions = variants.reduce((sum, v) => sum + v.conversions, 0);
@@ -50,7 +50,7 @@ export default function Index() {
         : null;
 
   const handleUpgrade = (plan: string) => {
-        navigate(`/app/billing?plan=${plan}`);
+        fetcher.submit({ plan }, { method: "post", action: "/app/billing" });
   };
 
   const resourceName = { singular: 'variant', plural: 'variants' };

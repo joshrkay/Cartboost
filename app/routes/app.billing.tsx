@@ -1,11 +1,11 @@
-import type { LoaderFunctionArgs } from "react-router";
+import type { ActionFunctionArgs } from "react-router";
 import { redirect } from "react-router";
 import { authenticate, PLANS } from "../shopify.server";
 
-export const loader = async ({ request }: LoaderFunctionArgs) => {
+export const action = async ({ request }: ActionFunctionArgs) => {
   const { billing } = await authenticate.admin(request);
-  const url = new URL(request.url);
-  const plan = url.searchParams.get("plan");
+  const formData = await request.formData();
+  const plan = formData.get("plan") as string;
 
   if (plan !== "pro" && plan !== "premium") {
     return redirect("/app");

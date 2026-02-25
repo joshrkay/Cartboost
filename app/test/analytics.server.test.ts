@@ -15,9 +15,9 @@ const MOCK_TEST = {
 
 function makeCountMock(data: Record<string, Record<string, number>>) {
   return ({ where }: any) => {
-    const variant = where?.variant;
+    const variantId = where?.variantId;
     const eventType = where?.eventType?.in ? "conversion" : where?.eventType;
-    return Promise.resolve(data?.[variant]?.[eventType] ?? 0);
+    return Promise.resolve(data?.[variantId]?.[eventType] ?? 0);
   };
 }
 describe("getOrCreateABTest", () => {
@@ -55,13 +55,13 @@ describe("getABTestStats", () => {
     mockDb.aBTest.findUnique.mockResolvedValue(null);
     expect(await getABTestStats("non-existent")).toEqual([]);
   });
-  it("counts real impressions and conversions from BarEvent", async () => {
+  it("counts real impressions and conversions using variantId", async () => {
     mockDb.aBTest.findUnique.mockResolvedValue(MOCK_TEST);
     mockDb.barEvent.count.mockImplementation(
       makeCountMock({
-        A: { impression: 6, conversion: 2 },
-        B: { impression: 5, conversion: 3 },
-        C: { impression: 0, conversion: 0 },
+        "v-a": { impression: 6, conversion: 2 },
+        "v-b": { impression: 5, conversion: 3 },
+        "v-c": { impression: 0, conversion: 0 },
       })
     );
     const result = await getABTestStats("test-id-123");
@@ -86,6 +86,17 @@ describe("getABTestStats", () => {
       expect(v.conversionRate).toBe(0);
     });
   });
+  it("queries BarEvent by variantId, not by variant name", async () => {
+    mockDb.aBTest.findUnique.mockResolvedValue(MOCK_TEST);
+    mockDb.barEvent.count.mockResolvedValue(5);
+    await getABTestStats("test-id-123");
+    // Verify all count calls use variantId, not variant name or shopDomain
+    for (const call of mockDb.barEvent.count.mock.calls) {
+      expect(call[0].where).toHaveProperty("variantId");
+      expect(call[0].where).not.toHaveProperty("variant");
+      expect(call[0].where).not.toHaveProperty("shopDomain");
+    }
+  });
   it("queries for both 'conversion' and 'add_to_cart' event types", async () => {
     mockDb.aBTest.findUnique.mockResolvedValue(MOCK_TEST);
     mockDb.barEvent.count.mockResolvedValue(5);
@@ -100,9 +111,9 @@ describe("getABTestStats", () => {
     mockDb.aBTest.findUnique.mockResolvedValue(MOCK_TEST);
     mockDb.barEvent.count.mockImplementation(
       makeCountMock({
-        A: { impression: 10, conversion: 5 },
-        B: { impression: 10, conversion: 5 },
-        C: { impression: 10, conversion: 5 },
+        "v-a": { impression: 10, conversion: 5 },
+        "v-b": { impression: 10, conversion: 5 },
+        "v-c": { impression: 10, conversion: 5 },
       })
     );
     const result = await getABTestStats("test-id-123");

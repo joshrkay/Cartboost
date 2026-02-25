@@ -42,12 +42,11 @@ export async function getABTestStats(testId: string): Promise<VariantStat[]> {
   return Promise.all(
     test.variants.map(async (v: any) => {
       const impressions = await db.barEvent.count({
-        where: { shopDomain: test.shop, variant: v.name, eventType: "impression" },
+        where: { variantId: v.id, eventType: "impression" },
       });
       const conversions = await db.barEvent.count({
         where: {
-          shopDomain: test.shop,
-          variant: v.name,
+          variantId: v.id,
           eventType: { in: ["conversion", "add_to_cart"] },
         },
       });
