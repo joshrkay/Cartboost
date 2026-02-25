@@ -29,10 +29,22 @@ import db from "../db.server";
 export const loader = async ({ request }: LoaderFunctionArgs) => {
     const { session } = await authenticate.admin(request);
     const shop = session.shop;
-    const test = await getOrCreateABTest(shop);
-    const variants = await getABTestStats(test.id);
-    const shopPlan = await db.shopPlan.findUnique({ where: { shop } });
+
+    // Fetch plan independently so an analytics failure never downgrades a paid merchant
+    const shopPlan = await db.shopPlan.findUnique({ where: { shop } }).catch((err) => {
+        console.error("Failed to load shop plan for", shop, err);
+        return null;
+    });
     const currentPlan = shopPlan?.plan ?? "free";
+
+    let variants: VariantStat[] = [];
+    try {
+        const test = await getOrCreateABTest(shop);
+        variants = await getABTestStats(test.id);
+    } catch (error) {
+        console.error("Failed to load analytics for", shop, error);
+    }
+
     return { shop, variants, currentPlan, prices: PLAN_PRICES };
 };
 

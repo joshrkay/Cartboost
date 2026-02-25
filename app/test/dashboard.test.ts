@@ -1,7 +1,29 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import db from "../db.server";
+import { getOrCreateABTest, getABTestStats } from "../models/analytics.server";
+import { authenticate } from "../shopify.server";
+import { loader } from "../routes/app._index";
+
+vi.mock("../models/analytics.server", () => ({
+  getOrCreateABTest: vi.fn(),
+  getABTestStats: vi.fn(),
+}));
+
+vi.mock("../shopify.server", () => ({
+  authenticate: {
+    admin: vi.fn(),
+  },
+  PLAN_PRICES: { pro: { amount: 7.99, currencyCode: "USD" }, premium: { amount: 10.99, currencyCode: "USD" } },
+}));
+
+vi.mock("@shopify/shopify-app-react-router/server", () => ({
+  boundary: { headers: vi.fn() },
+}));
 
 const mockDb = db as any;
+const mockGetOrCreateABTest = getOrCreateABTest as ReturnType<typeof vi.fn>;
+const mockGetABTestStats = getABTestStats as ReturnType<typeof vi.fn>;
+const mockAuthenticate = authenticate as { admin: ReturnType<typeof vi.fn> };
 
 /**
  * Tests for the dashboard loader logic:
@@ -127,5 +149,72 @@ describe("dashboard — analytics summary from real data", () => {
     expect(summary.totalConversions).toBe(5);
     expect(summary.avgCR).toBe(10);
     expect(summary.bestLift).toBe(0);
+  });
+});
+
+describe("dashboard loader — failure fallback (actual loader)", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  function mockShop(shop: string) {
+    mockAuthenticate.admin.mockResolvedValue({ session: { shop } });
+  }
+
+  function makeRequest() {
+    return new Request("http://test-shop/app");
+  }
+
+  it("returns empty variants when getOrCreateABTest throws, but defaults plan to free", async () => {
+    mockShop("failing-shop.myshopify.com");
+    mockGetOrCreateABTest.mockRejectedValue(new Error("DB connection lost"));
+    mockDb.shopPlan.findUnique.mockResolvedValue(null);
+
+    const data = await loader({ request: makeRequest(), context: {}, params: {} });
+    expect(data.shop).toBe("failing-shop.myshopify.com");
+    expect(data.variants).toEqual([]);
+    expect(data.currentPlan).toBe("free");
+  });
+
+  it("preserves paid plan when only analytics queries fail", async () => {
+    mockShop("shop.myshopify.com");
+    mockDb.shopPlan.findUnique.mockResolvedValue({ plan: "pro" });
+    mockGetOrCreateABTest.mockRejectedValue(new Error("DB connection lost"));
+
+    const data = await loader({ request: makeRequest(), context: {}, params: {} });
+    expect(data.variants).toEqual([]);
+    expect(data.currentPlan).toBe("pro");
+  });
+
+  it("preserves paid plan when getABTestStats throws", async () => {
+    mockShop("shop.myshopify.com");
+    mockDb.shopPlan.findUnique.mockResolvedValue({ plan: "premium" });
+    mockGetOrCreateABTest.mockResolvedValue({ id: "test-1", shop: "shop.myshopify.com", variants: [] });
+    mockGetABTestStats.mockRejectedValue(new Error("Query timeout"));
+
+    const data = await loader({ request: makeRequest(), context: {}, params: {} });
+    expect(data.variants).toEqual([]);
+    expect(data.currentPlan).toBe("premium");
+  });
+
+  it("falls back to free plan when shopPlan query throws", async () => {
+    mockShop("shop.myshopify.com");
+    mockGetOrCreateABTest.mockResolvedValue({ id: "test-1", shop: "shop.myshopify.com", variants: [] });
+    mockGetABTestStats.mockResolvedValue([]);
+    mockDb.shopPlan.findUnique.mockRejectedValue(new Error("Table not found"));
+
+    const data = await loader({ request: makeRequest(), context: {}, params: {} });
+    expect(data.variants).toEqual([]);
+    expect(data.currentPlan).toBe("free");
+  });
+
+  it("returns real data when all queries succeed", async () => {
+    mockShop("shop.myshopify.com");
+    const fakeVariants = [{ id: "v1", variant: "A", visitors: 100, conversions: 10 }];
+    mockGetOrCreateABTest.mockResolvedValue({ id: "test-1", shop: "shop.myshopify.com", variants: [] });
+    mockGetABTestStats.mockResolvedValue(fakeVariants);
+    mockDb.shopPlan.findUnique.mockResolvedValue({ plan: "pro" });
+
+    const data = await loader({ request: makeRequest(), context: {}, params: {} });
+    expect(data.variants).toEqual(fakeVariants);
+    expect(data.currentPlan).toBe("pro");
   });
 });
