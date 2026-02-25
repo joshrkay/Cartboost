@@ -21,9 +21,9 @@ export default function App() {
   return (
     <div className={styles.index}>
       <div className={styles.content}>
-        <h1 className={styles.heading}>A short heading about [your app]</h1>
+        <h1 className={styles.heading}>CartBoost — Smarter Free Shipping Bars</h1>
         <p className={styles.text}>
-          A tagline about [your app] that describes your value proposition.
+          Boost conversions with A/B-tested free shipping bars that adapt to your customers.
         </p>
         {showForm && (
           <Form className={styles.form} method="post" action="/auth/login">
@@ -39,16 +39,16 @@ export default function App() {
         )}
         <ul className={styles.list}>
           <li>
-            <strong>Product feature</strong>. Some detail about your feature and
-            its benefit to your customer.
+            <strong>A/B Testing</strong>. Automatically test bar variants and
+            find what converts best.
           </li>
           <li>
-            <strong>Product feature</strong>. Some detail about your feature and
-            its benefit to your customer.
+            <strong>Real-Time Analytics</strong>. Track impressions and
+            conversions with a live dashboard.
           </li>
           <li>
-            <strong>Product feature</strong>. Some detail about your feature and
-            its benefit to your customer.
+            <strong>One-Click Setup</strong>. Install, customize your bar, and
+            go live in minutes.
           </li>
         </ul>
       </div>
