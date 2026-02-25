@@ -1,6 +1,7 @@
 import type { ActionFunctionArgs } from "react-router";
 import { authenticate } from "../shopify.server";
 import db from "../db.server";
+import { checkRateLimit } from "../utils/rate-limiter.server";
 
 const VALID_EVENT_TYPES = ["impression", "click", "add_to_cart", "conversion"];
 const VALID_CUID_PATTERN = /^[a-z0-9]{20,30}$/;
@@ -14,6 +15,17 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
     if (!session?.shop) {
         return new Response("Unauthorized", { status: 401 });
+    }
+
+    // Rate limit is per-shop but all visitors share this bucket,
+    // so the limit must accommodate storefront traffic volume.
+    const { allowed } = checkRateLimit(`track:${session.shop}`, {
+        limit: 10_000,
+        windowMs: 60_000,
+    });
+
+    if (!allowed) {
+        return new Response("Too Many Requests", { status: 429 });
     }
 
     let body: { variantId?: unknown; eventType?: unknown };
@@ -53,7 +65,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
         return new Response(null, { status: 204 });
     } catch (error) {
-        console.error("Tracking Error:", error);
+        console.error("Tracking error", {
+            error: error instanceof Error ? error.message : "Unknown error",
+        });
         return new Response("Internal Server Error", { status: 500 });
     }
 };

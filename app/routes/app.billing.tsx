@@ -13,10 +13,15 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   const planName = plan === "pro" ? PLANS.pro : PLANS.premium;
 
+  const appUrl = process.env.SHOPIFY_APP_URL;
+  if (!appUrl) {
+    throw new Error("SHOPIFY_APP_URL environment variable is required for billing");
+  }
+
   await billing.request({
     plan: planName,
     isTest: process.env.NODE_ENV !== "production",
-    returnUrl: `${process.env.SHOPIFY_APP_URL}/app/billing/callback`,
+    returnUrl: `${appUrl}/app/billing/callback`,
   });
 
   return redirect("/app");

@@ -1,5 +1,5 @@
 import type { LoaderFunctionArgs, HeadersFunction } from "react-router";
-import { useLoaderData, useFetcher } from "react-router";
+import { useLoaderData, useFetcher, useNavigate } from "react-router";
 import { authenticate, PLAN_PRICES } from "../shopify.server";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import {
@@ -22,8 +22,8 @@ import {
     ChartLineIcon,
     ClockIcon,
 } from "@shopify/polaris-icons";
-import { useState } from "react";
-import { getOrCreateABTest, getABTestStats, type VariantStat } from "../models/analytics.server";
+import { getOrCreateABTest, getABTestStats, computeDateRange, getDateRangeLabel, type VariantStat } from "../models/analytics.server";
+
 import db from "../db.server";
 import {
     logRequestError,
@@ -31,25 +31,37 @@ import {
     shouldRecoverFromResponseError,
 } from "../utils/request-debug.server";
 
-async function loadDashboardData(shop: string, request: Request) {
+async function loadDashboardData(shop: string, request: Request, dateRangeKey: string) {
+    let variants: VariantStat[] = [];
+    let currentPlan = "free";
+
     try {
-        const test = await getOrCreateABTest(shop);
-        const variants = await getABTestStats(test.id);
         const shopPlan = await db.shopPlan.findUnique({ where: { shop } });
-        const currentPlan = shopPlan?.plan ?? "free";
-        return { variants, currentPlan };
+        currentPlan = shopPlan?.plan ?? "free";
     } catch (error) {
         logRequestError("Dashboard data load failed", request, error, { shop });
-        return { variants: [], currentPlan: "free" as const };
     }
+
+    try {
+        const test = await getOrCreateABTest(shop);
+        const dateRange = computeDateRange(dateRangeKey);
+        variants = await getABTestStats(test.id, dateRange);
+    } catch (error) {
+        logRequestError("Dashboard data load failed", request, error, { shop });
+    }
+
+    return { variants, currentPlan };
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
     try {
         const { session } = await authenticate.admin(request);
         const shop = session.shop;
-        const { variants, currentPlan } = await loadDashboardData(shop, request);
-        return { shop, variants, currentPlan, prices: PLAN_PRICES };
+        const url = new URL(request.url);
+        const dateRangeKey = url.searchParams.get("dateRange") || "last7";
+        const { variants, currentPlan } = await loadDashboardData(shop, request, dateRangeKey);
+        const dateRangeLabel = getDateRangeLabel(dateRangeKey);
+        return { shop, variants, currentPlan, prices: PLAN_PRICES, dateRange: dateRangeKey, dateRangeLabel };
     } catch (error) {
         if (shouldRecoverFromResponseError(error) || !(error instanceof Response)) {
             logRequestError("Dashboard loader authentication failed", request, error);
@@ -62,9 +74,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 };
 
 export default function Index() {
-    const { shop, variants, currentPlan, prices } = useLoaderData<typeof loader>();
+    const { shop, variants, currentPlan, prices, dateRange, dateRangeLabel } = useLoaderData<typeof loader>();
     const formatPrice = (plan: "pro" | "premium") => `$${prices[plan].amount}/mo`;
-    const [dateRange, setDateRange] = useState("last7");
+    const navigate = useNavigate();
     const fetcher = useFetcher();
 
   const totalVisitors = variants.reduce((sum, v) => sum + v.visitors, 0);
@@ -82,7 +94,7 @@ export default function Index() {
   const resourceName = { singular: 'variant', plural: 'variants' };
 
   const rowMarkup = variants.map(
-        ({ id, variant, color, visitors, conversions, conversionRate, lift, confidence, status }: VariantStat, index: number) => (
+        ({ id, variant, visitors, conversions, conversionRate, lift, confidence, status }: VariantStat, index: number) => (
                 <IndexTable.Row id={id} key={id} position={index}>
                           <IndexTable.Cell>
                                     <Badge tone={
@@ -127,7 +139,7 @@ export default function Index() {
                                                               label="Date Range"
                                                               labelInline
                                                               value={dateRange}
-                                                              onChange={setDateRange}
+                                                              onChange={(value) => navigate(`/app?dateRange=${value}`)}
                                                               options={[
                                                                 { label: "Last 7 days", value: "last7" },
                                                                 { label: "This week", value: "thisWeek" },
@@ -147,7 +159,7 @@ export default function Index() {
                                                                                               <Icon source={PersonIcon} tone="subdued" />
                                                                             </InlineStack>
                                                                             <Text variant="headingLg" as="p">{totalVisitors.toLocaleString()}</Text>
-                                                                            <Text variant="bodySm" tone="subdued" as="p">All time</Text>
+                                                                            <Text variant="bodySm" tone="subdued" as="p">{dateRangeLabel}</Text>
                                                             </BlockStack>
                                               </Card>
                                               <Card>
@@ -157,7 +169,7 @@ export default function Index() {
                                                                                               <Icon source={CartIcon} tone="subdued" />
                                                                             </InlineStack>
                                                                             <Text variant="headingLg" as="p">{totalConversions.toLocaleString()}</Text>
-                                                                            <Text variant="bodySm" tone="subdued" as="p">All time</Text>
+                                                                            <Text variant="bodySm" tone="subdued" as="p">{dateRangeLabel}</Text>
                                                             </BlockStack>
                                               </Card>
                                               <Card>

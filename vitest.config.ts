@@ -6,11 +6,12 @@ export default defineConfig({
     globals: true,
     environment: "node",
     setupFiles: ["./app/test/setup.ts"],
+    include: ["app/**/*.test.{ts,tsx}", "extensions/**/*.test.{js,ts}"],
     coverage: {
       provider: "v8",
       reporter: ["text", "json", "html"],
-      include: ["app/**/*.{ts,tsx}"],
-      exclude: ["app/test/**"],
+      include: ["app/**/*.{ts,tsx}", "extensions/**/*.{js,ts}"],
+      exclude: ["app/test/**", "extensions/**/*.test.*"],
     },
   },
 });

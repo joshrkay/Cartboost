@@ -9,7 +9,7 @@ embedded = true
 automatically_update_urls_on_dev = true
 
 [webhooks]
-api_version = "2026-04"
+api_version = "2025-10"
 
   [webhooks.privacy_compliance]
   customer_data_request_url = "/webhooks/customers/data_request"
@@ -19,7 +19,7 @@ api_version = "2026-04"
 
 [access_scopes]
 # Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
-scopes = "write_products"
+scopes = ""
 
 [auth]
 redirect_urls = [ "https://cartboost.vercel.app/auth/callback" ]
