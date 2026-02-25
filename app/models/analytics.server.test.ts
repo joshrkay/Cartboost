@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import db from "../db.server";
 import { getOrCreateABTest, getABTestStats } from "./analytics.server";
+
 const mockDb = db as any;
 const mockTestId = "test-id-123";
 const MOCK_TEST = {
@@ -14,25 +15,34 @@ const MOCK_TEST = {
   ],
 };
 
-function makeCountMock(data: Record<string, Record<string, number>>) {
-  return ({ where }: any) => {
-    const variantId = where?.variantId;
-    const eventType = where?.eventType?.in ? "conversion" : where?.eventType;
-    return Promise.resolve(data?.[variantId]?.[eventType] ?? 0);
+function makeGroupByMock(data: Record<string, Record<string, number>>) {
+  return () => {
+    const rows: Array<{ variantId: string; eventType: string; _count: { id: number } }> = [];
+    for (const [variantId, events] of Object.entries(data)) {
+      for (const [eventType, count] of Object.entries(events)) {
+        if (count > 0) {
+          rows.push({ variantId, eventType, _count: { id: count } });
+        }
+      }
+    }
+    return Promise.resolve(rows);
   };
 }
+
 describe("analytics.server", () => {
   beforeEach(() => vi.clearAllMocks());
+
   it("should return existing test if it exists", async () => {
     mockDb.aBTest.findFirst.mockResolvedValue(MOCK_TEST);
     const result = await getOrCreateABTest("test-shop.myshopify.com");
     expect(result).toEqual(MOCK_TEST);
     expect(mockDb.aBTest.create).not.toHaveBeenCalled();
   });
-  it("should calculate correct stats for variants using variantId", async () => {
+
+  it("should calculate correct stats for variants using groupBy", async () => {
     mockDb.aBTest.findUnique.mockResolvedValue(MOCK_TEST);
-    mockDb.barEvent.count.mockImplementation(
-      makeCountMock({
+    mockDb.barEvent.groupBy.mockImplementation(
+      makeGroupByMock({
         "v-a": { impression: 6, conversion: 2 },
         "v-b": { impression: 5, conversion: 3 },
         "v-c": { impression: 3, conversion: 1 },
@@ -46,9 +56,10 @@ describe("analytics.server", () => {
     expect(stats[1].visitors).toBe(5);
     expect(stats[1].conversionRate).toBe(60);
   });
+
   it("should show zeros when no events recorded — no hardcoded fallbacks", async () => {
     mockDb.aBTest.findUnique.mockResolvedValue(MOCK_TEST);
-    mockDb.barEvent.count.mockResolvedValue(0);
+    mockDb.barEvent.groupBy.mockResolvedValue([]);
     const stats = await getABTestStats(mockTestId);
     expect(stats[0].conversionRate).toBe(0);
     expect(stats[0].lift).toBe(0);

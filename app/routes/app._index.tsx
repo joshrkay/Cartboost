@@ -43,8 +43,8 @@ export default function Index() {
 
   const totalVisitors = variants.reduce((sum, v) => sum + v.visitors, 0);
     const totalConversions = variants.reduce((sum, v) => sum + v.conversions, 0);
-    const avgCR = (totalConversions / totalVisitors) * 100 || 0;
-    const bestLift = Math.max(...variants.map(v => v.lift));
+    const avgCR = totalVisitors > 0 ? (totalConversions / totalVisitors) * 100 : 0;
+    const bestLift = variants.length > 0 ? Math.max(...variants.map(v => v.lift)) : 0;
     const leadingVariant = totalVisitors > 0
         ? variants.reduce((best, v) => (v.lift > best.lift ? v : best), variants[0])
         : null;
