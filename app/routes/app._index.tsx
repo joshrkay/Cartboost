@@ -26,27 +26,26 @@ import { useState } from "react";
 import { getOrCreateABTest, getABTestStats, type VariantStat } from "../models/analytics.server";
 import db from "../db.server";
 
-async function loadDashboardData(shop: string) {
-    const test = await getOrCreateABTest(shop);
-    const [variants, shopPlan] = await Promise.all([
-        getABTestStats(test.id),
-        db.shopPlan.findUnique({ where: { shop } }),
-    ]);
-    const currentPlan = shopPlan?.plan ?? "free";
-    return { variants, currentPlan };
-}
-
 export const loader = async ({ request }: LoaderFunctionArgs) => {
     const { session } = await authenticate.admin(request);
     const shop = session.shop;
 
+    // Fetch plan independently so an analytics failure never downgrades a paid merchant
+    const shopPlan = await db.shopPlan.findUnique({ where: { shop } }).catch((err) => {
+        console.error("Failed to load shop plan for", shop, err);
+        return null;
+    });
+    const currentPlan = shopPlan?.plan ?? "free";
+
+    let variants: VariantStat[] = [];
     try {
-        const { variants, currentPlan } = await loadDashboardData(shop);
-        return { shop, variants, currentPlan, prices: PLAN_PRICES };
+        const test = await getOrCreateABTest(shop);
+        variants = await getABTestStats(test.id);
     } catch (error) {
-        console.error("Failed to load dashboard data for", shop, error);
-        return { shop, variants: [] as VariantStat[], currentPlan: "free", prices: PLAN_PRICES };
+        console.error("Failed to load analytics for", shop, error);
     }
+
+    return { shop, variants, currentPlan, prices: PLAN_PRICES };
 };
 
 export default function Index() {

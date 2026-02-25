@@ -163,9 +163,10 @@ describe("dashboard loader — failure fallback (actual loader)", () => {
     return new Request("http://test-shop/app");
   }
 
-  it("falls back to safe defaults when getOrCreateABTest throws", async () => {
+  it("returns empty variants when getOrCreateABTest throws, but defaults plan to free", async () => {
     mockShop("failing-shop.myshopify.com");
     mockGetOrCreateABTest.mockRejectedValue(new Error("DB connection lost"));
+    mockDb.shopPlan.findUnique.mockResolvedValue(null);
 
     const data = await loader({ request: makeRequest(), context: {}, params: {} });
     expect(data.shop).toBe("failing-shop.myshopify.com");
@@ -173,17 +174,28 @@ describe("dashboard loader — failure fallback (actual loader)", () => {
     expect(data.currentPlan).toBe("free");
   });
 
-  it("falls back to safe defaults when getABTestStats throws", async () => {
+  it("preserves paid plan when only analytics queries fail", async () => {
     mockShop("shop.myshopify.com");
+    mockDb.shopPlan.findUnique.mockResolvedValue({ plan: "pro" });
+    mockGetOrCreateABTest.mockRejectedValue(new Error("DB connection lost"));
+
+    const data = await loader({ request: makeRequest(), context: {}, params: {} });
+    expect(data.variants).toEqual([]);
+    expect(data.currentPlan).toBe("pro");
+  });
+
+  it("preserves paid plan when getABTestStats throws", async () => {
+    mockShop("shop.myshopify.com");
+    mockDb.shopPlan.findUnique.mockResolvedValue({ plan: "premium" });
     mockGetOrCreateABTest.mockResolvedValue({ id: "test-1", shop: "shop.myshopify.com", variants: [] });
     mockGetABTestStats.mockRejectedValue(new Error("Query timeout"));
 
     const data = await loader({ request: makeRequest(), context: {}, params: {} });
     expect(data.variants).toEqual([]);
-    expect(data.currentPlan).toBe("free");
+    expect(data.currentPlan).toBe("premium");
   });
 
-  it("falls back to safe defaults when shopPlan query throws", async () => {
+  it("falls back to free plan when shopPlan query throws", async () => {
     mockShop("shop.myshopify.com");
     mockGetOrCreateABTest.mockResolvedValue({ id: "test-1", shop: "shop.myshopify.com", variants: [] });
     mockGetABTestStats.mockResolvedValue([]);
