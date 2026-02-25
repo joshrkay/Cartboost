@@ -141,7 +141,48 @@
       });
   }
 
-  document.addEventListener('DOMContentLoaded', initCartBoostBar);
+  // Push page content down so it's not hidden behind the fixed bar
+  function adjustBodyOffset() {
+    var bar = document.getElementById('cartboost-bar');
+    if (bar) {
+      document.body.style.marginTop = bar.offsetHeight + 'px';
+    }
+  }
+
+  // Universal cart change detection — intercept fetch and XHR to Shopify cart endpoints.
+  // This works on all themes, not just Dawn-based themes that fire custom events.
+  var cartUrlPattern = /\/cart\/(add|change|update|clear)\.js/;
+
+  var originalFetch = window.fetch;
+  window.fetch = function() {
+    var url = typeof arguments[0] === 'string' ? arguments[0] : (arguments[0] && arguments[0].url) || '';
+    var result = originalFetch.apply(this, arguments);
+    if (cartUrlPattern.test(url)) {
+      result.then(function() { updateCartBoostMessage(); });
+    }
+    return result;
+  };
+
+  var originalXHROpen = XMLHttpRequest.prototype.open;
+  var originalXHRSend = XMLHttpRequest.prototype.send;
+  XMLHttpRequest.prototype.open = function(method, url) {
+    this._cartboostUrl = url;
+    return originalXHROpen.apply(this, arguments);
+  };
+  XMLHttpRequest.prototype.send = function() {
+    if (cartUrlPattern.test(this._cartboostUrl || '')) {
+      this.addEventListener('load', function() { updateCartBoostMessage(); });
+    }
+    return originalXHRSend.apply(this, arguments);
+  };
+
+  document.addEventListener('DOMContentLoaded', function() {
+    initCartBoostBar();
+    adjustBodyOffset();
+  });
+  window.addEventListener('resize', adjustBodyOffset);
+
+  // Keep theme-specific event listeners as a bonus for themes that support them
   document.addEventListener('cart:updated', updateCartBoostMessage);
   document.addEventListener('cart:change', updateCartBoostMessage);
   document.addEventListener('cart:refresh', updateCartBoostMessage);
