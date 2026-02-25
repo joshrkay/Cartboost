@@ -12,6 +12,75 @@ export interface VariantStat {
   status: string;
 }
 
+/**
+ * Standard normal CDF approximation (Abramowitz & Stegun 26.2.17).
+ * Max error < 1.5e-7. No external library needed.
+ */
+function normCdf(x: number): number {
+  if (x < -8) return 0;
+  if (x > 8) return 1;
+  const a1 = 0.254829592;
+  const a2 = -0.284496736;
+  const a3 = 1.421413741;
+  const a4 = -1.453152027;
+  const a5 = 1.061405429;
+  const p = 0.3275911;
+  const sign = x < 0 ? -1 : 1;
+  const absX = Math.abs(x);
+  const t = 1.0 / (1.0 + p * absX);
+  const y =
+    1.0 -
+    (((((a5 * t + a4) * t + a3) * t + a2) * t + a1) * t *
+      Math.exp((-absX * absX) / 2));
+  return 0.5 * (1.0 + sign * y);
+}
+
+/**
+ * Two-proportion z-test confidence (0–100).
+ * Returns 0 when there is insufficient data.
+ */
+function computeConfidence(
+  controlImpressions: number,
+  controlConversions: number,
+  variantImpressions: number,
+  variantConversions: number,
+): number {
+  if (controlImpressions === 0 || variantImpressions === 0) return 0;
+
+  const pC = controlConversions / controlImpressions;
+  const pT = variantConversions / variantImpressions;
+  const pooled =
+    (controlConversions + variantConversions) /
+    (controlImpressions + variantImpressions);
+
+  if (pooled === 0 || pooled === 1) return 0;
+
+  const se = Math.sqrt(
+    pooled * (1 - pooled) * (1 / controlImpressions + 1 / variantImpressions),
+  );
+  if (se === 0) return 0;
+
+  const z = Math.abs(pT - pC) / se;
+  const confidence = (normCdf(z) - 0.5) * 2 * 100;
+  return Number(confidence.toFixed(1));
+}
+
+/**
+ * Derive variant status from lift direction and statistical confidence.
+ */
+function computeStatus(
+  variantName: string,
+  lift: number,
+  confidence: number,
+  impressions: number,
+): string {
+  if (variantName === "A") return "Control";
+  if (impressions < 5) return "Collecting";
+  if (confidence >= 95) return lift > 0 ? "Winning" : "Losing";
+  if (confidence >= 70) return lift > 0 ? "Promising" : "Underperforming";
+  return "Stable";
+}
+
 export async function getOrCreateABTest(shop: string) {
   const existing = await db.aBTest.findFirst({
     where: { shop },
@@ -89,8 +158,16 @@ export async function getABTestStats(testId: string): Promise<VariantStat[]> {
       v.name === "A" || controlCR === 0
         ? 0
         : Number(((conversionRate - controlCR) / controlCR * 100).toFixed(1));
-    const status =
-      conversionRate >= 4 ? "Winning" : conversionRate >= 2 ? "Stable" : "Improving";
+    const confidence =
+      v.name === "A"
+        ? 0
+        : computeConfidence(
+            controlCounts.impressions,
+            controlCounts.conversions,
+            impressions,
+            conversions,
+          );
+    const status = computeStatus(v.name, lift, confidence, impressions);
 
     return {
       id: v.id,
@@ -100,8 +177,7 @@ export async function getABTestStats(testId: string): Promise<VariantStat[]> {
       conversions,
       conversionRate: Number(conversionRate.toFixed(2)),
       lift,
-      confidence:
-        impressions > 30 ? 95 : impressions > 10 ? 75 : impressions > 0 ? 50 : 0,
+      confidence,
       status,
     };
   });

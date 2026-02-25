@@ -1,6 +1,6 @@
 import type { LoaderFunctionArgs, HeadersFunction } from "react-router";
 import { useLoaderData, useFetcher } from "react-router";
-import { authenticate } from "../shopify.server";
+import { authenticate, PLAN_PRICES } from "../shopify.server";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import {
     Page,
@@ -33,11 +33,12 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     const variants = await getABTestStats(test.id);
     const shopPlan = await db.shopPlan.findUnique({ where: { shop } });
     const currentPlan = shopPlan?.plan ?? "free";
-    return { shop, variants, currentPlan };
+    return { shop, variants, currentPlan, prices: PLAN_PRICES };
 };
 
 export default function Index() {
-    const { shop, variants, currentPlan } = useLoaderData<typeof loader>();
+    const { shop, variants, currentPlan, prices } = useLoaderData<typeof loader>();
+    const formatPrice = (plan: "pro" | "premium") => `$${prices[plan].amount}/mo`;
     const [dateRange, setDateRange] = useState("last7");
     const fetcher = useFetcher();
 
@@ -59,7 +60,12 @@ export default function Index() {
         ({ id, variant, color, visitors, conversions, conversionRate, lift, confidence, status }: VariantStat, index: number) => (
                 <IndexTable.Row id={id} key={id} position={index}>
                           <IndexTable.Cell>
-                                    <Badge tone={status === "Winning" ? "success" : status === "Stable" ? "info" : undefined}>
+                                    <Badge tone={
+                                      status === "Winning" || status === "Promising" ? "success" :
+                                      status === "Losing" ? "critical" :
+                                      status === "Underperforming" ? "warning" :
+                                      "info"
+                                    }>
                                       {status}
                                     </Badge>
                           </IndexTable.Cell>
@@ -189,17 +195,17 @@ export default function Index() {
                     <Text as="p">Choose Pro or Premium to unlock full A/B testing and advanced reporting.</Text>
                     <BlockStack gap="200">
                       <Button variant="primary" onClick={() => handleUpgrade("pro")} fullWidth>
-                        Upgrade to Pro — $7.99/mo
+                        {`Upgrade to Pro — ${formatPrice("pro")}`}
                       </Button>
                       <Button variant="primary" onClick={() => handleUpgrade("premium")} fullWidth>
-                        Upgrade to Premium — $10.99/mo
+                        {`Upgrade to Premium — ${formatPrice("premium")}`}
                       </Button>
                     </BlockStack>
                   </>
                 ) : (
                   <BlockStack gap="200">
                     <Badge tone="success">
-                      {currentPlan === "premium" ? "Premium Plan — $10.99/mo" : "Pro Plan — $7.99/mo"}
+                      {currentPlan === "premium" ? `Premium Plan — ${formatPrice("premium")}` : `Pro Plan — ${formatPrice("pro")}`}
                     </Badge>
                     <Text as="p" tone="subdued">
                       {currentPlan === "pro"
@@ -208,7 +214,7 @@ export default function Index() {
                     </Text>
                     {currentPlan === "pro" && (
                       <Button variant="plain" onClick={() => handleUpgrade("premium")}>
-                        Upgrade to Premium — $10.99/mo
+                        {`Upgrade to Premium — ${formatPrice("premium")}`}
                       </Button>
                     )}
                   </BlockStack>

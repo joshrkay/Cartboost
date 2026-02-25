@@ -39,30 +39,32 @@ describe("analytics.server", () => {
     expect(mockDb.aBTest.create).not.toHaveBeenCalled();
   });
 
-  it("should calculate correct stats for variants using groupBy", async () => {
+  it("should calculate correct stats with z-test confidence", async () => {
     mockDb.aBTest.findUnique.mockResolvedValue(MOCK_TEST);
+    // Control: 5% CR, B: 15% CR, C: ~33% CR — strong effects with enough data
     mockDb.barEvent.groupBy.mockImplementation(
       makeGroupByMock({
-        "v-a": { impression: 6, conversion: 2 },
-        "v-b": { impression: 5, conversion: 3 },
-        "v-c": { impression: 3, conversion: 1 },
+        "v-a": { impression: 200, conversion: 10 },
+        "v-b": { impression: 200, conversion: 30 },
+        "v-c": { impression: 200, conversion: 10 },
       })
     );
     const stats = await getABTestStats(mockTestId);
-    expect(stats[0].visitors).toBe(6);
-    expect(stats[0].conversions).toBe(2);
-    expect(stats[0].conversionRate).toBe(33.33);
-    expect(stats[0].status).toBe("Winning");
-    expect(stats[1].visitors).toBe(5);
-    expect(stats[1].conversionRate).toBe(60);
+    expect(stats[0].visitors).toBe(200);
+    expect(stats[0].conversions).toBe(10);
+    expect(stats[0].status).toBe("Control"); // Variant A is always Control
+    expect(stats[1].visitors).toBe(200);
+    expect(stats[1].status).toBe("Winning"); // B has high lift + high confidence
+    expect(stats[1].confidence).toBeGreaterThanOrEqual(95);
   });
 
-  it("should show zeros when no events recorded — no hardcoded fallbacks", async () => {
+  it("should show zeros and Collecting status when no events recorded", async () => {
     mockDb.aBTest.findUnique.mockResolvedValue(MOCK_TEST);
     mockDb.barEvent.groupBy.mockResolvedValue([]);
     const stats = await getABTestStats(mockTestId);
     expect(stats[0].conversionRate).toBe(0);
     expect(stats[0].lift).toBe(0);
-    expect(stats[0].status).toBe("Improving");
+    expect(stats[0].status).toBe("Control");
+    expect(stats[1].status).toBe("Collecting");
   });
 });

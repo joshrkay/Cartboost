@@ -20,6 +20,11 @@ export const PLANS = {
   premium: "CartBoost Premium",
 } as const;
 
+export const PLAN_PRICES = {
+  pro: { amount: 7.99, currencyCode: "USD" },
+  premium: { amount: 10.99, currencyCode: "USD" },
+} as const;
+
 const shopify = shopifyApp({
   apiKey: process.env.SHOPIFY_API_KEY,
   apiSecretKey: process.env.SHOPIFY_API_SECRET,

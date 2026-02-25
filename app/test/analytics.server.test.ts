@@ -115,7 +115,6 @@ describe("getABTestStats", () => {
     mockDb.aBTest.findUnique.mockResolvedValue(MOCK_TEST);
     mockDb.barEvent.groupBy.mockResolvedValue([]);
     await getABTestStats("test-id-123");
-    // Should make exactly 1 groupBy call, not 2*N count calls
     expect(mockDb.barEvent.groupBy).toHaveBeenCalledTimes(1);
     expect(mockDb.barEvent.groupBy).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -123,26 +122,6 @@ describe("getABTestStats", () => {
         where: { variantId: { in: ["v-a", "v-b", "v-c"] } },
       })
     );
-  });
-
-  it("status is Winning when conversion rate >= 4%", async () => {
-    mockDb.aBTest.findUnique.mockResolvedValue(MOCK_TEST);
-    mockDb.barEvent.groupBy.mockImplementation(
-      makeGroupByMock({
-        "v-a": { impression: 10, conversion: 5 },
-        "v-b": { impression: 10, conversion: 5 },
-        "v-c": { impression: 10, conversion: 5 },
-      })
-    );
-    const result = await getABTestStats("test-id-123");
-    result.forEach(v => expect(v.status).toBe("Winning"));
-  });
-
-  it("status is Improving when conversion rate is 0%", async () => {
-    mockDb.aBTest.findUnique.mockResolvedValue(MOCK_TEST);
-    mockDb.barEvent.groupBy.mockResolvedValue([]);
-    const result = await getABTestStats("test-id-123");
-    result.forEach(v => expect(v.status).toBe("Improving"));
   });
 
   it("includes add_to_cart events in conversions count", async () => {
@@ -155,5 +134,117 @@ describe("getABTestStats", () => {
     const result = await getABTestStats("test-id-123");
     const varA = result.find(v => v.variant === "A")!;
     expect(varA.conversions).toBe(5); // 3 + 2
+  });
+
+  // --- Confidence z-test tests ---
+
+  it("confidence uses z-test and scales with sample size", async () => {
+    mockDb.aBTest.findUnique.mockResolvedValue(MOCK_TEST);
+    mockDb.barEvent.groupBy.mockImplementation(
+      makeGroupByMock({
+        "v-a": { impression: 1000, conversion: 50 },
+        "v-b": { impression: 1000, conversion: 80 },
+        "v-c": { impression: 10, conversion: 1 },
+      })
+    );
+    const result = await getABTestStats("test-id-123");
+    const varB = result.find(v => v.variant === "B")!;
+    const varC = result.find(v => v.variant === "C")!;
+    // Large sample + large effect => high confidence
+    expect(varB.confidence).toBeGreaterThan(90);
+    // Small sample => lower confidence than large sample
+    expect(varC.confidence).toBeLessThan(varB.confidence);
+  });
+
+  it("control variant always has 0 confidence and Control status", async () => {
+    mockDb.aBTest.findUnique.mockResolvedValue(MOCK_TEST);
+    mockDb.barEvent.groupBy.mockImplementation(
+      makeGroupByMock({
+        "v-a": { impression: 100, conversion: 10 },
+        "v-b": { impression: 100, conversion: 10 },
+        "v-c": { impression: 100, conversion: 10 },
+      })
+    );
+    const result = await getABTestStats("test-id-123");
+    const varA = result.find(v => v.variant === "A")!;
+    expect(varA.confidence).toBe(0);
+    expect(varA.status).toBe("Control");
+  });
+
+  // --- Status tests based on lift + confidence ---
+
+  it("status is Winning when lift is positive and confidence >= 95%", async () => {
+    mockDb.aBTest.findUnique.mockResolvedValue(MOCK_TEST);
+    // Control: 5% CR, Variant B: 15% CR — large effect, large sample
+    mockDb.barEvent.groupBy.mockImplementation(
+      makeGroupByMock({
+        "v-a": { impression: 200, conversion: 10 },
+        "v-b": { impression: 200, conversion: 30 },
+        "v-c": { impression: 200, conversion: 10 },
+      })
+    );
+    const result = await getABTestStats("test-id-123");
+    const varB = result.find(v => v.variant === "B")!;
+    expect(varB.status).toBe("Winning");
+    expect(varB.confidence).toBeGreaterThanOrEqual(95);
+    expect(varB.lift).toBeGreaterThan(0);
+  });
+
+  it("status is Losing when lift is negative with high confidence", async () => {
+    mockDb.aBTest.findUnique.mockResolvedValue(MOCK_TEST);
+    // Control: 15% CR, Variant B: 5% CR — negative lift
+    mockDb.barEvent.groupBy.mockImplementation(
+      makeGroupByMock({
+        "v-a": { impression: 200, conversion: 30 },
+        "v-b": { impression: 200, conversion: 10 },
+        "v-c": { impression: 200, conversion: 30 },
+      })
+    );
+    const result = await getABTestStats("test-id-123");
+    const varB = result.find(v => v.variant === "B")!;
+    expect(varB.status).toBe("Losing");
+    expect(varB.lift).toBeLessThan(0);
+  });
+
+  it("status is Collecting when fewer than 5 impressions", async () => {
+    mockDb.aBTest.findUnique.mockResolvedValue(MOCK_TEST);
+    mockDb.barEvent.groupBy.mockImplementation(
+      makeGroupByMock({
+        "v-a": { impression: 100, conversion: 5 },
+        "v-b": { impression: 3, conversion: 1 },
+        "v-c": { impression: 0, conversion: 0 },
+      })
+    );
+    const result = await getABTestStats("test-id-123");
+    const varB = result.find(v => v.variant === "B")!;
+    const varC = result.find(v => v.variant === "C")!;
+    expect(varB.status).toBe("Collecting");
+    expect(varC.status).toBe("Collecting");
+  });
+
+  it("status is Collecting for all non-control variants when no events", async () => {
+    mockDb.aBTest.findUnique.mockResolvedValue(MOCK_TEST);
+    mockDb.barEvent.groupBy.mockResolvedValue([]);
+    const result = await getABTestStats("test-id-123");
+    const varA = result.find(v => v.variant === "A")!;
+    const varB = result.find(v => v.variant === "B")!;
+    expect(varA.status).toBe("Control");
+    expect(varB.status).toBe("Collecting");
+  });
+
+  it("status is Stable when confidence is below 70%", async () => {
+    mockDb.aBTest.findUnique.mockResolvedValue(MOCK_TEST);
+    // Small samples, similar rates — low confidence
+    mockDb.barEvent.groupBy.mockImplementation(
+      makeGroupByMock({
+        "v-a": { impression: 20, conversion: 2 },
+        "v-b": { impression: 20, conversion: 3 },
+        "v-c": { impression: 20, conversion: 2 },
+      })
+    );
+    const result = await getABTestStats("test-id-123");
+    const varB = result.find(v => v.variant === "B")!;
+    expect(varB.confidence).toBeLessThan(70);
+    expect(varB.status).toBe("Stable");
   });
 });

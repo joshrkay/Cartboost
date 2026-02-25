@@ -6,10 +6,14 @@ vi.mock("../shopify.server", () => ({
     pro: "CartBoost Pro",
     premium: "CartBoost Premium",
   },
+  PLAN_PRICES: {
+    pro: { amount: 7.99, currencyCode: "USD" },
+    premium: { amount: 10.99, currencyCode: "USD" },
+  },
   authenticate: {},
 }));
 
-import { PLANS } from "../shopify.server";
+import { PLANS, PLAN_PRICES } from "../shopify.server";
 
 /**
  * Unit tests for the billing loader logic.
@@ -61,5 +65,15 @@ describe("billing loader", () => {
     const result = parseBillingRequest("");
     expect(result.redirect).toBe("/app");
     expect(result.billingRequest).toBeNull();
+  });
+});
+
+describe("PLAN_PRICES", () => {
+  it("has a price entry for every plan key", () => {
+    for (const key of Object.keys(PLANS)) {
+      expect(PLAN_PRICES).toHaveProperty(key);
+      expect((PLAN_PRICES as any)[key].amount).toBeGreaterThan(0);
+      expect((PLAN_PRICES as any)[key].currencyCode).toBe("USD");
+    }
   });
 });
