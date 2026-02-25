@@ -1,7 +1,6 @@
-import type { LoaderFunctionArgs } from "react-router";
 import db from "../db.server";
 
-export const loader = async ({ request }: LoaderFunctionArgs) => {
+export const loader = async () => {
   try {
     await db.$queryRaw`SELECT 1`;
 

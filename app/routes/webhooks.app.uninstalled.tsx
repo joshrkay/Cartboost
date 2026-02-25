@@ -3,7 +3,7 @@ import { authenticate } from "../shopify.server";
 import db from "../db.server";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-  const { shop, topic } = await authenticate.webhook(request);
+  const { shop } = await authenticate.webhook(request);
 
   // Webhook requests can trigger multiple times and after an app has already been uninstalled.
   // Delete all app data for this shop. ABVariant -> BarEvent cascade via onDelete: Cascade.

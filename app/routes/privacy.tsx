@@ -1,3 +1,4 @@
+/* eslint-disable react/no-unescaped-entities */
 import type { MetaFunction } from "react-router";
 
 export const meta: MetaFunction = () => {
@@ -17,7 +18,7 @@ export default function Privacy() {
       <h1>Privacy Policy</h1>
       <p><strong>Last updated: February 25, 2026</strong></p>
 
-      <p>CartBoost ("we", "us", or "our") operates the CartBoost Free Shipping Bar app (the "App") for the Shopify platform. This Privacy Policy explains how we collect, use, store, and protect information when merchants install and use our App.</p>
+      <p>CartBoost (&quot;we&quot;, &quot;us&quot;, or &quot;our&quot;) operates the CartBoost Free Shipping Bar app (the &quot;App&quot;) for the Shopify platform. This Privacy Policy explains how we collect, use, store, and protect information when merchants install and use our App.</p>
 
       <h2>1. Information We Collect</h2>
 

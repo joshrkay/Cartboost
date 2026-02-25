@@ -24,12 +24,6 @@ import {
 } from "@shopify/polaris-icons";
 import { getOrCreateABTest, getABTestStats, computeDateRange, getDateRangeLabel, type VariantStat } from "../models/analytics.server";
 
-const DATE_RANGE_OPTIONS = [
-    { label: "Last 7 days", value: "last7" },
-    { label: "This week", value: "thisWeek" },
-    { label: "This month", value: "thisMonth" },
-    { label: "Last 30 days", value: "last30" },
-] as const;
 import db from "../db.server";
 import {
     logRequestError,
@@ -100,7 +94,7 @@ export default function Index() {
   const resourceName = { singular: 'variant', plural: 'variants' };
 
   const rowMarkup = variants.map(
-        ({ id, variant, color, visitors, conversions, conversionRate, lift, confidence, status }: VariantStat, index: number) => (
+        ({ id, variant, visitors, conversions, conversionRate, lift, confidence, status }: VariantStat, index: number) => (
                 <IndexTable.Row id={id} key={id} position={index}>
                           <IndexTable.Cell>
                                     <Badge tone={

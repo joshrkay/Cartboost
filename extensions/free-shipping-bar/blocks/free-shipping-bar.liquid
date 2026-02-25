@@ -139,7 +139,7 @@
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ attributes: { _cartboost_variant: cbActiveVariantId, _cartboost_vid: cbVisitorId } }),
-          }).catch(function() {});
+          }).catch(function(err) { console.error('CartBoost: Failed to write cart attributes:', err); });
           cbSendEvent('impression', cbActiveVariantId);
         }
 

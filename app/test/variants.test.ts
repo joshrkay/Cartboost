@@ -1,7 +1,4 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import db from "../db.server";
-
-const mockDb = db as any;
 
 /**
  * Unit-level tests for api.variants.tsx logic.
