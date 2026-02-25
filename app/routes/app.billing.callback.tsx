@@ -21,7 +21,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         create: { shop: session.shop, plan: activePlan },
       });
     } catch (error) {
-      console.error("Failed to persist billing plan:", error);
+      console.error("Failed to persist billing plan", {
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
   }
 

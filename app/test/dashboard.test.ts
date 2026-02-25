@@ -7,6 +7,8 @@ import { loader } from "../routes/app._index";
 vi.mock("../models/analytics.server", () => ({
   getOrCreateABTest: vi.fn(),
   getABTestStats: vi.fn(),
+  computeDateRange: vi.fn().mockReturnValue({ from: new Date(), to: new Date() }),
+  getDateRangeLabel: vi.fn().mockReturnValue("Last 7 days"),
 }));
 
 vi.mock("../shopify.server", () => ({

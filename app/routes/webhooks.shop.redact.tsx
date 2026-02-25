@@ -3,9 +3,7 @@ import { authenticate } from "../shopify.server";
 import db from "../db.server";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-  const { shop, topic } = await authenticate.webhook(request);
-
-  console.log(`Received ${topic} webhook for ${shop}`);
+  const { shop } = await authenticate.webhook(request);
 
   try {
     // Delete all data stored for this shop in a single transaction.
@@ -17,10 +15,11 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       db.session.deleteMany({ where: { shop } }),
     ]);
 
-    console.log(`Shop redact complete — all data deleted for ${shop}`);
     return new Response(null, { status: 200 });
   } catch (error) {
-    console.error(`Shop redact failed for ${shop}:`, error);
+    console.error("Shop redact failed", {
+      error: error instanceof Error ? error.message : String(error),
+    });
     return new Response("Internal Server Error", { status: 500 });
   }
 };

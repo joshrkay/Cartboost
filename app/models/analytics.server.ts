@@ -114,18 +114,78 @@ export async function getOrCreateABTest(shop: string) {
   }
 }
 
-export async function getABTestStats(testId: string): Promise<VariantStat[]> {
+export interface DateRange {
+  from: Date;
+  to: Date;
+}
+
+const DATE_RANGE_LABELS: Record<string, string> = {
+  last7: "Last 7 days",
+  thisWeek: "This week",
+  thisMonth: "This month",
+  last30: "Last 30 days",
+};
+
+export function getDateRangeLabel(rangeKey: string): string {
+  return DATE_RANGE_LABELS[rangeKey] ?? "Last 7 days";
+}
+
+export function computeDateRange(rangeKey: string): DateRange {
+  const now = new Date();
+  const to = now;
+  let from: Date;
+
+  switch (rangeKey) {
+    case "thisWeek": {
+      from = new Date(now);
+      from.setDate(now.getDate() - now.getDay());
+      from.setHours(0, 0, 0, 0);
+      break;
+    }
+    case "thisMonth": {
+      from = new Date(now.getFullYear(), now.getMonth(), 1);
+      break;
+    }
+    case "last30": {
+      from = new Date(now);
+      from.setDate(now.getDate() - 30);
+      from.setHours(0, 0, 0, 0);
+      break;
+    }
+    case "last7":
+    default: {
+      from = new Date(now);
+      from.setDate(now.getDate() - 7);
+      from.setHours(0, 0, 0, 0);
+      break;
+    }
+  }
+
+  return { from, to };
+}
+
+export async function getABTestStats(
+  testId: string,
+  dateRange?: DateRange,
+): Promise<VariantStat[]> {
   const test = await db.aBTest.findUnique({
     where: { id: testId },
     include: { variants: true },
   });
   if (!test) return [];
 
+  const dateFilter = dateRange
+    ? { createdAt: { gte: dateRange.from, lte: dateRange.to } }
+    : {};
+
   // Single query for all event counts instead of 2 per variant
   const eventCounts = await db.barEvent.groupBy({
     by: ["variantId", "eventType"],
     _count: { id: true },
-    where: { variantId: { in: test.variants.map((v) => v.id) } },
+    where: {
+      variantId: { in: test.variants.map((v) => v.id) },
+      ...dateFilter,
+    },
   });
 
   const countMap = new Map<string, { impressions: number; conversions: number }>();

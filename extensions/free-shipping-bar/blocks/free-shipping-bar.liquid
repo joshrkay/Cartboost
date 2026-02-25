@@ -82,7 +82,6 @@
 
       document.getElementById('cartboost-bar').style.background = bgColor;
       document.getElementById('cartboost-bar').setAttribute('data-cartboost-variant', variantLetter);
-      console.log('CartBoost ' + tier.toUpperCase() + ' Variant ' + variantLetter + ' shown (' + numVariants + ' variants)');
 
       // Fetch real variant IDs from the server, then send impression
       fetch('/apps/cartboost/api/variants')
@@ -95,7 +94,7 @@
             sendEvent('impression', activeVariantId);
           }
         })
-        .catch(function(err) { console.error('Failed to load variants:', err); });
+        .catch(function() {});
     } else {
       // Free tier — fetch variants and use the first one (A) for tracking
       fetch('/apps/cartboost/api/variants')
@@ -107,7 +106,7 @@
             sendEvent('impression', activeVariantId);
           }
         })
-        .catch(function(err) { console.error('Failed to load variants:', err); });
+        .catch(function() {});
     }
 
     updateCartBoostMessage();
@@ -122,7 +121,7 @@
         variantId: variantId,
         eventType: eventType,
       }),
-    }).catch(function(err) { console.error('Tracking failed:', err); });
+    }).catch(function() {});
   }
 
   function updateCartBoostMessage() {
@@ -149,8 +148,11 @@
     }
   }
 
-  // Universal cart change detection — intercept fetch and XHR to Shopify cart endpoints.
-  // This works on all themes, not just Dawn-based themes that fire custom events.
+  // Cart change detection: Shopify themes use fetch() or XHR to update the cart via
+  // /cart/add|change|update|clear.js endpoints. We intercept these calls to detect
+  // cart updates and refresh the shipping bar message. This approach is necessary because
+  // not all themes fire custom JavaScript events for cart changes. The original fetch/XHR
+  // functions are preserved and called normally — we only add a post-response handler.
   var cartUrlPattern = /\/cart\/(add|change|update|clear)\.js/;
 
   var originalFetch = window.fetch;

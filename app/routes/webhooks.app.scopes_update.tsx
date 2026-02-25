@@ -3,8 +3,7 @@ import { authenticate } from "../shopify.server";
 import db from "../db.server";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-    const { payload, session, topic, shop } = await authenticate.webhook(request);
-    console.log(`Received ${topic} webhook for ${shop}`);
+    const { payload, session } = await authenticate.webhook(request);
 
     try {
         const current = Array.isArray(payload.current) ? payload.current : [];
@@ -16,7 +15,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         }
         return new Response(null, { status: 200 });
     } catch (error) {
-        console.error(`Scopes update failed for ${shop}:`, error);
+        console.error("Scopes update failed", {
+            error: error instanceof Error ? error.message : String(error),
+        });
         return new Response("Internal Server Error", { status: 500 });
     }
 };
