@@ -26,13 +26,23 @@ import { useState } from "react";
 import { getOrCreateABTest, getABTestStats, type VariantStat } from "../models/analytics.server";
 import db from "../db.server";
 
+async function loadDashboardData(shop: string) {
+    try {
+        const test = await getOrCreateABTest(shop);
+        const variants = await getABTestStats(test.id);
+        const shopPlan = await db.shopPlan.findUnique({ where: { shop } });
+        const currentPlan = shopPlan?.plan ?? "free";
+        return { variants, currentPlan };
+    } catch (error) {
+        console.error("Dashboard data load failed", { shop, error });
+        return { variants: [], currentPlan: "free" as const };
+    }
+}
+
 export const loader = async ({ request }: LoaderFunctionArgs) => {
     const { session } = await authenticate.admin(request);
     const shop = session.shop;
-    const test = await getOrCreateABTest(shop);
-    const variants = await getABTestStats(test.id);
-    const shopPlan = await db.shopPlan.findUnique({ where: { shop } });
-    const currentPlan = shopPlan?.plan ?? "free";
+    const { variants, currentPlan } = await loadDashboardData(shop);
     return { shop, variants, currentPlan, prices: PLAN_PRICES };
 };
 
