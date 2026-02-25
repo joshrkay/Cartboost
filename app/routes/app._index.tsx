@@ -27,23 +27,26 @@ import { getOrCreateABTest, getABTestStats, type VariantStat } from "../models/a
 import db from "../db.server";
 
 async function loadDashboardData(shop: string) {
-    try {
-        const test = await getOrCreateABTest(shop);
-        const variants = await getABTestStats(test.id);
-        const shopPlan = await db.shopPlan.findUnique({ where: { shop } });
-        const currentPlan = shopPlan?.plan ?? "free";
-        return { variants, currentPlan };
-    } catch (error) {
-        console.error("Dashboard data load failed", { shop, error });
-        return { variants: [], currentPlan: "free" as const };
-    }
+    const test = await getOrCreateABTest(shop);
+    const [variants, shopPlan] = await Promise.all([
+        getABTestStats(test.id),
+        db.shopPlan.findUnique({ where: { shop } }),
+    ]);
+    const currentPlan = shopPlan?.plan ?? "free";
+    return { variants, currentPlan };
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
     const { session } = await authenticate.admin(request);
     const shop = session.shop;
-    const { variants, currentPlan } = await loadDashboardData(shop);
-    return { shop, variants, currentPlan, prices: PLAN_PRICES };
+
+    try {
+        const { variants, currentPlan } = await loadDashboardData(shop);
+        return { shop, variants, currentPlan, prices: PLAN_PRICES };
+    } catch (error) {
+        console.error("Failed to load dashboard data for", shop, error);
+        return { shop, variants: [] as VariantStat[], currentPlan: "free", prices: PLAN_PRICES };
+    }
 };
 
 export default function Index() {
