@@ -25,7 +25,7 @@ vi.mock("@shopify/shopify-app-react-router/server", () => ({
 const mockDb = db as any;
 const mockGetOrCreateABTest = getOrCreateABTest as ReturnType<typeof vi.fn>;
 const mockGetABTestStats = getABTestStats as ReturnType<typeof vi.fn>;
-const mockAuthenticate = authenticate as { admin: ReturnType<typeof vi.fn> };
+const mockAuthenticate = authenticate as unknown as { admin: ReturnType<typeof vi.fn> };
 
 /**
  * Tests for the dashboard loader logic:
@@ -170,7 +170,7 @@ describe("dashboard loader — failure fallback (actual loader)", () => {
     mockGetOrCreateABTest.mockRejectedValue(new Error("DB connection lost"));
     mockDb.shopPlan.findUnique.mockResolvedValue(null);
 
-    const data = await loader({ request: makeRequest(), context: {}, params: {} });
+    const data = await loader({ request: makeRequest(), context: {}, params: {}, unstable_pattern: "" });
     expect(data.shop).toBe("failing-shop.myshopify.com");
     expect(data.variants).toEqual([]);
     expect(data.currentPlan).toBe("free");
@@ -181,7 +181,7 @@ describe("dashboard loader — failure fallback (actual loader)", () => {
     mockDb.shopPlan.findUnique.mockResolvedValue({ plan: "pro" });
     mockGetOrCreateABTest.mockRejectedValue(new Error("DB connection lost"));
 
-    const data = await loader({ request: makeRequest(), context: {}, params: {} });
+    const data = await loader({ request: makeRequest(), context: {}, params: {}, unstable_pattern: "" });
     expect(data.variants).toEqual([]);
     expect(data.currentPlan).toBe("pro");
   });
@@ -192,7 +192,7 @@ describe("dashboard loader — failure fallback (actual loader)", () => {
     mockGetOrCreateABTest.mockResolvedValue({ id: "test-1", shop: "shop.myshopify.com", variants: [] });
     mockGetABTestStats.mockRejectedValue(new Error("Query timeout"));
 
-    const data = await loader({ request: makeRequest(), context: {}, params: {} });
+    const data = await loader({ request: makeRequest(), context: {}, params: {}, unstable_pattern: "" });
     expect(data.variants).toEqual([]);
     expect(data.currentPlan).toBe("premium");
   });
@@ -203,7 +203,7 @@ describe("dashboard loader — failure fallback (actual loader)", () => {
     mockGetABTestStats.mockResolvedValue([]);
     mockDb.shopPlan.findUnique.mockRejectedValue(new Error("Table not found"));
 
-    const data = await loader({ request: makeRequest(), context: {}, params: {} });
+    const data = await loader({ request: makeRequest(), context: {}, params: {}, unstable_pattern: "" });
     expect(data.variants).toEqual([]);
     expect(data.currentPlan).toBe("free");
   });
@@ -215,7 +215,7 @@ describe("dashboard loader — failure fallback (actual loader)", () => {
     mockGetABTestStats.mockResolvedValue(fakeVariants);
     mockDb.shopPlan.findUnique.mockResolvedValue({ plan: "pro" });
 
-    const data = await loader({ request: makeRequest(), context: {}, params: {} });
+    const data = await loader({ request: makeRequest(), context: {}, params: {}, unstable_pattern: "" });
     expect(data.variants).toEqual(fakeVariants);
     expect(data.currentPlan).toBe("pro");
   });

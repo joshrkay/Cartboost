@@ -12,7 +12,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       },
       { status: 200 },
     );
-  } catch {
+  } catch (error) {
+    console.error("Health check failed: database query failed", {
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
     return Response.json(
       {
         status: "error",

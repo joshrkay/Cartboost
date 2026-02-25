@@ -17,8 +17,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         return new Response("Unauthorized", { status: 401 });
     }
 
+    // Rate limit is per-shop but all visitors share this bucket,
+    // so the limit must accommodate storefront traffic volume.
     const { allowed } = checkRateLimit(`track:${session.shop}`, {
-        limit: 100,
+        limit: 10_000,
         windowMs: 60_000,
     });
 

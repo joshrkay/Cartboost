@@ -1,6 +1,9 @@
 {% comment %}
-  CartBoost Free Shipping Bar - Final Version with Real Tracking
+  CartBoost Free Shipping Bar
   getcartboost.com
+
+  Core logic lives in assets/cartboost-core.js (unit-tested).
+  This Liquid file is a thin shell: reads settings, calls API, updates DOM.
 
   Note: Plan prices in the schema labels below must be manually synced
   with PLAN_PRICES in app/shopify.server.ts (Liquid schema is static JSON).
@@ -14,49 +17,70 @@
   <span id="cartboost-message">Add ${{ block.settings.threshold | default: 50 }} more for free shipping!</span>
 </div>
 
+<script src="{{ 'cartboost-core.js' | asset_url }}"></script>
+
 <script>
   // Safe JS defaults - use JSON filter to escape apostrophes and special chars
-  const defaultBelow = 'Add X more for free shipping!';
-  const defaultUnlocked = "You\u2019ve unlocked free shipping!";
-  let messageBelow = {{ block.settings.below_message | json }} || defaultBelow;
-  let messageUnlocked = {{ block.settings.above_message | json }} || defaultUnlocked;
+  var cbDefaultBelow = 'Add X more for free shipping!';
+  var cbDefaultUnlocked = "You\u2019ve unlocked free shipping!";
+  var cbMessageBelow = {{ block.settings.below_message | json }} || cbDefaultBelow;
+  var cbMessageUnlocked = {{ block.settings.above_message | json }} || cbDefaultUnlocked;
 
-  // Tracks the selected variant ID for use in subsequent events
-  let activeVariantId = null;
+  // State
+  var cbActiveVariantId = null;
+  var cbVisitorId = null;
+  var cbSentEvents = {};
 
   function initCartBoostBar() {
-    const tier = {{ block.settings.tier | default: "free" | json }};
-    const numVariants = parseInt({{ block.settings.num_variants | default: "2" | json }});
-    const testMode = {{ block.settings.ab_test_mode | default: "same_message" | json }};
-    let bgColor = {{ block.settings.bar_background_color | json }};
+    var tier = {{ block.settings.tier | default: "free" | json }};
+    var numVariants = parseInt({{ block.settings.num_variants | default: "2" | json }});
+    var testMode = {{ block.settings.ab_test_mode | default: "same_message" | json }};
+    var defaultBgColor = {{ block.settings.bar_background_color | json }};
+
+    // Sticky visitor ID for deduplication
+    var vidResult = getOrCreateVisitorId(getCookie('cartboost_vid'));
+    cbVisitorId = vidResult.id;
+    if (vidResult.isNew) {
+      setCookie('cartboost_vid', cbVisitorId, 30);
+    }
+
+    // Sticky variant assignment (persists across page loads)
+    var assignment = getOrAssignVariant(numVariants, getCookie('cartboost_variant'));
+    var variantIndex = assignment.index;
+    if (assignment.isNew) {
+      setCookie('cartboost_variant', String(variantIndex), 30);
+    }
+
+    var variantLetter = String.fromCharCode(65 + variantIndex);
+
+    // Build variant config arrays from block settings
+    var variantColors = [];
+    var variantBelow = [];
+    var variantUnlocked = [];
 
     if (tier !== 'free') {
-      let activeColors = [];
-      let activeBelow = [];
-      let activeUnlocked = [];
-
       if (tier === 'pro') {
-        activeColors = [
+        variantColors = [
           {{ block.settings.variant_a | json }},
           {{ block.settings.variant_b | json }},
           {{ block.settings.variant_c | json }}
         ].slice(0, numVariants);
       } else if (tier === 'premium') {
-        activeColors = [
+        variantColors = [
           {{ block.settings.variant_a | json }},
           {{ block.settings.variant_b | json }},
           {{ block.settings.variant_c | json }},
           {{ block.settings.variant_d | json }},
           {{ block.settings.variant_e | json }}
         ].slice(0, numVariants);
-        activeBelow = [
+        variantBelow = [
           {{ block.settings.variant_a_below | json }},
           {{ block.settings.variant_b_below | json }},
           {{ block.settings.variant_c_below | json }},
           {{ block.settings.variant_d_below | json }},
           {{ block.settings.variant_e_below | json }}
         ].slice(0, numVariants);
-        activeUnlocked = [
+        variantUnlocked = [
           {{ block.settings.variant_a_unlocked | json }},
           {{ block.settings.variant_b_unlocked | json }},
           {{ block.settings.variant_c_unlocked | json }},
@@ -64,79 +88,95 @@
           {{ block.settings.variant_e_unlocked | json }}
         ].slice(0, numVariants);
       }
-
-      const randomIndex = Math.floor(Math.random() * numVariants);
-      const variantLetter = String.fromCharCode(65 + randomIndex);
-
-      if (testMode === 'same_message') {
-        bgColor = activeColors[randomIndex];
-      } else if (testMode === 'random_message_random_color') {
-        bgColor = activeColors[Math.floor(Math.random() * activeColors.length)];
-        messageBelow = activeBelow[Math.floor(Math.random() * activeBelow.length)] || messageBelow;
-        messageUnlocked = activeUnlocked[Math.floor(Math.random() * activeUnlocked.length)] || messageUnlocked;
-      } else if (testMode === 'paired') {
-        bgColor = activeColors[randomIndex];
-        messageBelow = activeBelow[randomIndex] || messageBelow;
-        messageUnlocked = activeUnlocked[randomIndex] || messageUnlocked;
-      }
-
-      document.getElementById('cartboost-bar').style.background = bgColor;
-      document.getElementById('cartboost-bar').setAttribute('data-cartboost-variant', variantLetter);
-
-      // Fetch real variant IDs from the server, then send impression
-      fetch('/apps/cartboost/api/variants')
-        .then(function(r) { return r.json(); })
-        .then(function(data) {
-          var variants = data.variants || [];
-          var matched = variants.find(function(v) { return v.name === variantLetter; });
-          if (matched) {
-            activeVariantId = matched.id;
-            sendEvent('impression', activeVariantId);
-          }
-        })
-        .catch(function() {});
-    } else {
-      // Free tier — fetch variants and use the first one (A) for tracking
-      fetch('/apps/cartboost/api/variants')
-        .then(function(r) { return r.json(); })
-        .then(function(data) {
-          var variants = data.variants || [];
-          if (variants.length > 0) {
-            activeVariantId = variants[0].id;
-            sendEvent('impression', activeVariantId);
-          }
-        })
-        .catch(function() {});
     }
+
+    // Use core function to select variant config
+    var config = selectVariantConfig(
+      tier, testMode,
+      { colors: variantColors, belowMessages: variantBelow, unlockedMessages: variantUnlocked },
+      variantIndex, defaultBgColor, cbMessageBelow, cbMessageUnlocked
+    );
+
+    cbMessageBelow = config.belowMessage;
+    cbMessageUnlocked = config.unlockedMessage;
+
+    var barEl = document.getElementById('cartboost-bar');
+    barEl.style.background = config.bgColor;
+    barEl.setAttribute('data-cartboost-variant', variantLetter);
+
+    // Fetch real variant IDs + server-enforced plan from the server
+    fetch('/apps/cartboost/api/variants')
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        var variants = data.variants || [];
+        // Server-side plan enforcement: override client tier with server truth
+        var serverPlan = data.plan || 'free';
+        var serverMaxVariants = data.maxVariants || 1;
+        var serverAllowedModes = data.allowedTestModes || ['same_message'];
+
+        // Re-apply variant config using server-enforced plan
+        var enforcedConfig = selectVariantConfig(
+          serverPlan,
+          serverAllowedModes.indexOf(testMode) !== -1 ? testMode : 'same_message',
+          { colors: variantColors, belowMessages: variantBelow, unlockedMessages: variantUnlocked },
+          Math.min(variantIndex, serverMaxVariants - 1),
+          defaultBgColor, cbMessageBelow, cbMessageUnlocked
+        );
+        cbMessageBelow = enforcedConfig.belowMessage;
+        cbMessageUnlocked = enforcedConfig.unlockedMessage;
+        barEl.style.background = enforcedConfig.bgColor;
+
+        var matched;
+        if (serverPlan === 'free') {
+          matched = variants.length > 0 ? variants[0] : null;
+        } else {
+          matched = variants.find(function(v) { return v.name === variantLetter; });
+        }
+        if (matched) {
+          cbActiveVariantId = matched.id;
+          // Write variant to cart attributes for order attribution
+          fetch('/cart/update.js', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ attributes: { _cartboost_variant: cbActiveVariantId, _cartboost_vid: cbVisitorId } }),
+          }).catch(function() {});
+          cbSendEvent('impression', cbActiveVariantId);
+        }
+
+        // Refresh the bar message with enforced config
+        updateCartBoostMessage();
+      })
+      .catch(function(err) { console.error('CartBoost: Failed to load variants:', err); });
 
     updateCartBoostMessage();
   }
 
-  function sendEvent(eventType, variantId) {
+  function cbSendEvent(eventType, variantId) {
     if (!variantId) return;
+    // Client-side dedup: only send each event type per variant once per page load
+    if (shouldDeduplicateEvent(eventType, variantId, cbSentEvents)) return;
+    var payload = {
+      variantId: variantId,
+      eventType: eventType,
+    };
+    if (cbVisitorId) {
+      payload.visitorId = cbVisitorId;
+    }
     fetch('/apps/cartboost/api/track-event', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        variantId: variantId,
-        eventType: eventType,
-      }),
-    }).catch(function() {});
+      body: JSON.stringify(payload),
+    }).catch(function(err) { console.error('CartBoost: Tracking failed:', err); });
   }
 
   function updateCartBoostMessage() {
     fetch('/cart.js', { cache: 'default' })
       .then(function(r) { return r.json(); })
       .then(function(cart) {
-        const subtotal = cart.total_price / 100;
-        const threshold = {{ block.settings.threshold | default: 50 }};
-        const msgEl = document.getElementById('cartboost-message');
-        if (subtotal >= threshold) {
-          msgEl.textContent = messageUnlocked;
-        } else {
-          const remaining = (threshold - subtotal).toFixed(2);
-          msgEl.textContent = messageBelow.replace('X', remaining);
-        }
+        var subtotal = cart.total_price / 100;
+        var threshold = {{ block.settings.threshold | default: 50 }};
+        var msgEl = document.getElementById('cartboost-message');
+        msgEl.textContent = computeBarMessage(subtotal, threshold, cbMessageBelow, cbMessageUnlocked);
       });
   }
 
@@ -160,7 +200,13 @@
     var url = typeof arguments[0] === 'string' ? arguments[0] : (arguments[0] && arguments[0].url) || '';
     var result = originalFetch.apply(this, arguments);
     if (cartUrlPattern.test(url)) {
-      result.then(function() { updateCartBoostMessage(); });
+      result.then(function() {
+        updateCartBoostMessage();
+        // Fire add_to_cart event on cart mutations (skip our own attribute writes)
+        if (cbActiveVariantId && url.indexOf('/cart/update.js') === -1) {
+          cbSendEvent('add_to_cart', cbActiveVariantId);
+        }
+      });
     }
     return result;
   };
@@ -173,7 +219,13 @@
   };
   XMLHttpRequest.prototype.send = function() {
     if (cartUrlPattern.test(this._cartboostUrl || '')) {
-      this.addEventListener('load', function() { updateCartBoostMessage(); });
+      this.addEventListener('load', function() {
+        updateCartBoostMessage();
+        // Fire add_to_cart event on cart mutations via XHR
+        if (cbActiveVariantId) {
+          cbSendEvent('add_to_cart', cbActiveVariantId);
+        }
+      });
     }
     return originalXHRSend.apply(this, arguments);
   };
