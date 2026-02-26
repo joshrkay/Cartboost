@@ -23,6 +23,7 @@ import {
     ClockIcon,
 } from "@shopify/polaris-icons";
 import { getOrCreateABTest, getABTestStats, computeDateRange, getDateRangeLabel, type VariantStat } from "../models/analytics.server";
+import { DashboardEmptyState } from "../components/DashboardEmptyState";
 
 import db from "../db.server";
 import {
@@ -78,6 +79,10 @@ export default function Index() {
     const formatPrice = (plan: "pro" | "premium") => `$${prices[plan].amount}/mo`;
     const navigate = useNavigate();
     const fetcher = useFetcher();
+
+  if (variants.length === 0) {
+    return <DashboardEmptyState />;
+  }
 
   const totalVisitors = variants.reduce((sum, v) => sum + v.visitors, 0);
     const totalConversions = variants.reduce((sum, v) => sum + v.conversions, 0);
