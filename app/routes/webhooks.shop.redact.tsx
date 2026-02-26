@@ -20,18 +20,18 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   }
 
   try {
-    await db.$transaction([
+    await db.$transaction(async (tx) => {
       // Delete analytics events for this shop
-      db.analyticsEvent.deleteMany({ where: { shop: shopDomain } }),
+      await tx.analyticsEvent.deleteMany({ where: { shop: shopDomain } });
       // Delete AB tests (cascades to variants via onDelete: Cascade)
-      db.aBTest.deleteMany({ where: { shop: shopDomain } }),
+      await tx.aBTest.deleteMany({ where: { shop: shopDomain } });
       // Delete bar events
-      db.barEvent.deleteMany({ where: { shopDomain } }),
+      await tx.barEvent.deleteMany({ where: { shopDomain } });
       // Delete shop plan
-      db.shopPlan.deleteMany({ where: { shop: shopDomain } }),
+      await tx.shopPlan.deleteMany({ where: { shop: shopDomain } });
       // Delete sessions
-      db.session.deleteMany({ where: { shop: shopDomain } }),
-    ]);
+      await tx.session.deleteMany({ where: { shop: shopDomain } });
+    });
 
     console.log(`Shop redact completed for ${shopDomain} - all data deleted`);
   } catch (error) {
