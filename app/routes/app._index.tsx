@@ -1,6 +1,6 @@
 import type { LoaderFunctionArgs, HeadersFunction } from "react-router";
-import { useLoaderData, useFetcher } from "react-router";
-import { authenticate } from "../shopify.server";
+import { useLoaderData, useFetcher, useNavigate } from "react-router";
+import { authenticate, PLAN_PRICES } from "../shopify.server";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import {
     Page,
@@ -22,27 +22,70 @@ import {
     ChartLineIcon,
     ClockIcon,
 } from "@shopify/polaris-icons";
-import { useState } from "react";
-import { getOrCreateABTest, getABTestStats, type VariantStat } from "../models/analytics.server";
+import { getOrCreateABTest, getABTestStats, computeDateRange, getDateRangeLabel, type VariantStat } from "../models/analytics.server";
+
 import db from "../db.server";
+import {
+    logRequestError,
+    redirectToLoginForEmbeddedShop,
+    shouldRecoverFromResponseError,
+} from "../utils/request-debug.server";
+
+async function loadDashboardData(shop: string, request: Request, dateRangeKey: string) {
+    let variants: VariantStat[] = [];
+    let currentPlan = "free";
+
+    try {
+        const shopPlan = await db.shopPlan.findUnique({ where: { shop } });
+        currentPlan = shopPlan?.plan ?? "free";
+    } catch (error) {
+        logRequestError("Dashboard data load failed", request, error, { shop });
+    }
+
+    try {
+        const test = await getOrCreateABTest(shop);
+        const dateRange = computeDateRange(dateRangeKey);
+        variants = await getABTestStats(test.id, dateRange);
+    } catch (error) {
+        logRequestError("Dashboard data load failed", request, error, { shop });
+    }
+
+    return { variants, currentPlan };
+}
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-    const { session } = await authenticate.admin(request);
-    const shop = session.shop;
-    const test = await getOrCreateABTest(shop);
-    const variants = await getABTestStats(test.id);
-    return { shop, variants };
+    try {
+        const { session } = await authenticate.admin(request);
+        const shop = session.shop;
+        const url = new URL(request.url);
+        const dateRangeKey = url.searchParams.get("dateRange") || "last7";
+        const { variants, currentPlan } = await loadDashboardData(shop, request, dateRangeKey);
+        const dateRangeLabel = getDateRangeLabel(dateRangeKey);
+        return { shop, variants, currentPlan, prices: PLAN_PRICES, dateRange: dateRangeKey, dateRangeLabel };
+    } catch (error) {
+        if (shouldRecoverFromResponseError(error) || !(error instanceof Response)) {
+            logRequestError("Dashboard loader authentication failed", request, error);
+            const loginRedirect = redirectToLoginForEmbeddedShop(request);
+            if (loginRedirect) throw loginRedirect;
+        }
+
+        throw error;
+    }
 };
 
 export default function Index() {
-    const { shop, variants, currentPlan } = useLoaderData<typeof loader>();
-    const [dateRange, setDateRange] = useState("last7");
+    const { shop, variants, currentPlan, prices, dateRange, dateRangeLabel } = useLoaderData<typeof loader>();
+    const formatPrice = (plan: "pro" | "premium") => `$${prices[plan].amount}/mo`;
+    const navigate = useNavigate();
     const fetcher = useFetcher();
 
   const totalVisitors = variants.reduce((sum, v) => sum + v.visitors, 0);
     const totalConversions = variants.reduce((sum, v) => sum + v.conversions, 0);
-    const avgCR = (totalConversions / totalVisitors) * 100 || 0;
-    const bestLift = Math.max(...variants.map(v => v.lift));
+    const avgCR = totalVisitors > 0 ? (totalConversions / totalVisitors) * 100 : 0;
+    const bestLift = variants.length > 0 ? Math.max(...variants.map(v => v.lift)) : 0;
+    const leadingVariant = totalVisitors > 0
+        ? variants.reduce((best, v) => (v.lift > best.lift ? v : best), variants[0])
+        : null;
 
   const handleUpgrade = (plan: string) => {
         fetcher.submit({ plan }, { method: "post", action: "/app/billing" });
@@ -51,10 +94,15 @@ export default function Index() {
   const resourceName = { singular: 'variant', plural: 'variants' };
 
   const rowMarkup = variants.map(
-        ({ id, variant, color, visitors, conversions, conversionRate, lift, confidence, status }: VariantStat, index: number) => (
+        ({ id, variant, visitors, conversions, conversionRate, lift, confidence, status }: VariantStat, index: number) => (
                 <IndexTable.Row id={id} key={id} position={index}>
                           <IndexTable.Cell>
-                                    <Badge tone={status === "Winning" ? "success" : status === "Stable" ? "info" : undefined}>
+                                    <Badge tone={
+                                      status === "Winning" || status === "Promising" ? "success" :
+                                      status === "Losing" ? "critical" :
+                                      status === "Underperforming" ? "warning" :
+                                      "info"
+                                    }>
                                       {status}
                                     </Badge>
                           </IndexTable.Cell>
@@ -91,7 +139,7 @@ export default function Index() {
                                                               label="Date Range"
                                                               labelInline
                                                               value={dateRange}
-                                                              onChange={setDateRange}
+                                                              onChange={(value) => navigate(`/app?dateRange=${value}`)}
                                                               options={[
                                                                 { label: "Last 7 days", value: "last7" },
                                                                 { label: "This week", value: "thisWeek" },
@@ -111,7 +159,7 @@ export default function Index() {
                                                                                               <Icon source={PersonIcon} tone="subdued" />
                                                                             </InlineStack>
                                                                             <Text variant="headingLg" as="p">{totalVisitors.toLocaleString()}</Text>
-                                                                            <Badge tone="success">+12% vs last period</Badge>
+                                                                            <Text variant="bodySm" tone="subdued" as="p">{dateRangeLabel}</Text>
                                                             </BlockStack>
                                               </Card>
                                               <Card>
@@ -121,7 +169,7 @@ export default function Index() {
                                                                                               <Icon source={CartIcon} tone="subdued" />
                                                                             </InlineStack>
                                                                             <Text variant="headingLg" as="p">{totalConversions.toLocaleString()}</Text>
-                                                                            <Badge tone="success">+8% vs last period</Badge>
+                                                                            <Text variant="bodySm" tone="subdued" as="p">{dateRangeLabel}</Text>
                                                             </BlockStack>
                                               </Card>
                                               <Card>
@@ -141,7 +189,11 @@ export default function Index() {
                                                                                               <Icon source={CheckIcon} tone="success" />
                                                                             </InlineStack>
                                                                             <Text variant="headingLg" as="p" tone="success">+{bestLift}% Lift</Text>
-                                                                            <Text variant="bodySm" tone="subdued" as="p">Variation B is leading</Text>
+                                                                            <Text variant="bodySm" tone="subdued" as="p">
+                                                                              {leadingVariant
+                                                                                ? `Variation ${leadingVariant.variant} is leading`
+                                                                                : "No data yet"}
+                                                                            </Text>
                                                             </BlockStack>
                                               </Card>
                                   </div>
@@ -180,17 +232,17 @@ export default function Index() {
                     <Text as="p">Choose Pro or Premium to unlock full A/B testing and advanced reporting.</Text>
                     <BlockStack gap="200">
                       <Button variant="primary" onClick={() => handleUpgrade("pro")} fullWidth>
-                        Upgrade to Pro — $7.99/mo
+                        {`Upgrade to Pro — ${formatPrice("pro")}`}
                       </Button>
                       <Button variant="primary" onClick={() => handleUpgrade("premium")} fullWidth>
-                        Upgrade to Premium — $10.99/mo
+                        {`Upgrade to Premium — ${formatPrice("premium")}`}
                       </Button>
                     </BlockStack>
                   </>
                 ) : (
                   <BlockStack gap="200">
                     <Badge tone="success">
-                      {currentPlan === "premium" ? "Premium Plan — $10.99/mo" : "Pro Plan — $7.99/mo"}
+                      {currentPlan === "premium" ? `Premium Plan — ${formatPrice("premium")}` : `Pro Plan — ${formatPrice("pro")}`}
                     </Badge>
                     <Text as="p" tone="subdued">
                       {currentPlan === "pro"
@@ -199,7 +251,7 @@ export default function Index() {
                     </Text>
                     {currentPlan === "pro" && (
                       <Button variant="plain" onClick={() => handleUpgrade("premium")}>
-                        Upgrade to Premium — $10.99/mo
+                        {`Upgrade to Premium — ${formatPrice("premium")}`}
                       </Button>
                     )}
                   </BlockStack>

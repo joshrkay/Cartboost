@@ -1,10 +1,7 @@
 {
-  "ratings": {
-    "stars": {
-      "label": "Ratings"
-    },
-    "home": {
-      "recommendationText": "Recommended Product!"
-    }
+  "shipping_bar": {
+    "name": "Free Shipping Bar",
+    "below_threshold": "Add {{ amount }} more for free shipping!",
+    "above_threshold": "You've unlocked free shipping!"
   }
 }
