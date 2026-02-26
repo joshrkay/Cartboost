@@ -164,6 +164,37 @@ export function computeDateRange(rangeKey: string): DateRange {
   return { from, to };
 }
 
+const DEFAULT_RETENTION_DAYS = 90;
+
+/**
+ * Delete BarEvent records older than the retention period.
+ * Returns the number of deleted records.
+ */
+export async function purgeExpiredEvents(
+  retentionDays: number = DEFAULT_RETENTION_DAYS,
+): Promise<number> {
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - retentionDays);
+
+  const result = await db.barEvent.deleteMany({
+    where: { createdAt: { lt: cutoff } },
+  });
+
+  return result.count;
+}
+
+/**
+ * Delete expired sessions (past their expiry date).
+ * Returns the number of deleted records.
+ */
+export async function purgeExpiredSessions(): Promise<number> {
+  const result = await db.session.deleteMany({
+    where: { expires: { lt: new Date() } },
+  });
+
+  return result.count;
+}
+
 export async function getABTestStats(
   testId: string,
   dateRange?: DateRange,

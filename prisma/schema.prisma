@@ -67,6 +67,7 @@ model BarEvent {
   createdAt   DateTime  @default(now())
 
   @@index([variantId, eventType])
+  @@index([createdAt])
 }
 
 model ShopPlan {
