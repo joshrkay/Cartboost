@@ -220,3 +220,64 @@ describe("dashboard loader — failure fallback (actual loader)", () => {
     expect(data.currentPlan).toBe("pro");
   });
 });
+
+describe("dashboard — zero state vs populated state (regression)", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  function mockShop(shop: string) {
+    mockAuthenticate.admin.mockResolvedValue({ session: { shop } });
+  }
+
+  function makeRequest(query = "") {
+    return new Request(`http://test-shop/app${query}`);
+  }
+
+  it("returns variants.length === 0 for a brand-new shop with no experiments (triggers empty state)", async () => {
+    mockShop("new-merchant.myshopify.com");
+    mockDb.shopPlan.findUnique.mockResolvedValue(null);
+    mockGetOrCreateABTest.mockResolvedValue({ id: "test-1", shop: "new-merchant.myshopify.com" });
+    mockGetABTestStats.mockResolvedValue([]);
+
+    const data = await loader({ request: makeRequest(), context: {}, params: {}, unstable_pattern: "" });
+    expect(data.variants).toEqual([]);
+    expect(data.variants.length).toBe(0);
+  });
+
+  it("returns populated variants for a shop with active experiments (triggers data view)", async () => {
+    mockShop("active-merchant.myshopify.com");
+    mockDb.shopPlan.findUnique.mockResolvedValue({ plan: "pro" });
+    const populatedVariants = [
+      { id: "v1", variant: "A", visitors: 500, conversions: 50, conversionRate: 10, lift: 0, confidence: 0, status: "Control" },
+      { id: "v2", variant: "B", visitors: 480, conversions: 72, conversionRate: 15, lift: 50, confidence: 96, status: "Winning" },
+    ];
+    mockGetOrCreateABTest.mockResolvedValue({ id: "test-1", shop: "active-merchant.myshopify.com" });
+    mockGetABTestStats.mockResolvedValue(populatedVariants);
+
+    const data = await loader({ request: makeRequest(), context: {}, params: {}, unstable_pattern: "" });
+    expect(data.variants.length).toBeGreaterThan(0);
+    expect(data.variants).toEqual(populatedVariants);
+  });
+
+  it("returns empty variants when analytics fail, triggering empty state even for existing shops", async () => {
+    mockShop("existing-but-broken.myshopify.com");
+    mockDb.shopPlan.findUnique.mockResolvedValue({ plan: "premium" });
+    mockGetOrCreateABTest.mockRejectedValue(new Error("Connection reset"));
+
+    const data = await loader({ request: makeRequest(), context: {}, params: {}, unstable_pattern: "" });
+    expect(data.variants).toEqual([]);
+    expect(data.variants.length).toBe(0);
+    // Plan should still be preserved even when empty state is triggered
+    expect(data.currentPlan).toBe("premium");
+  });
+
+  it("respects dateRange parameter in both empty and populated states", async () => {
+    mockShop("shop.myshopify.com");
+    mockDb.shopPlan.findUnique.mockResolvedValue(null);
+    mockGetOrCreateABTest.mockResolvedValue({ id: "test-1", shop: "shop.myshopify.com" });
+    mockGetABTestStats.mockResolvedValue([]);
+
+    const data = await loader({ request: makeRequest("?dateRange=last30"), context: {}, params: {}, unstable_pattern: "" });
+    expect(data.variants).toEqual([]);
+    expect(data.dateRange).toBe("last30");
+  });
+});
