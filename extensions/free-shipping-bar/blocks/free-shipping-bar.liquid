@@ -159,9 +159,6 @@
       variantId: variantId,
       eventType: eventType,
     };
-    if (cbVisitorId) {
-      payload.visitorId = cbVisitorId;
-    }
     fetch('/apps/cartboost/api/track-event', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -218,11 +215,12 @@
     return originalXHROpen.apply(this, arguments);
   };
   XMLHttpRequest.prototype.send = function() {
-    if (cartUrlPattern.test(this._cartboostUrl || '')) {
+    var xhrUrl = this._cartboostUrl || '';
+    if (cartUrlPattern.test(xhrUrl)) {
       this.addEventListener('load', function() {
         updateCartBoostMessage();
-        // Fire add_to_cart event on cart mutations via XHR
-        if (cbActiveVariantId) {
+        // Fire add_to_cart event on cart mutations via XHR (skip our own attribute writes)
+        if (cbActiveVariantId && xhrUrl.indexOf('/cart/update.js') === -1) {
           cbSendEvent('add_to_cart', cbActiveVariantId);
         }
       });

@@ -224,7 +224,7 @@ export async function getABTestStats(
     const entry = countMap.get(row.variantId) ?? { impressions: 0, conversions: 0 };
     if (row.eventType === "impression") {
       entry.impressions = row._count.id;
-    } else if (row.eventType === "conversion" || row.eventType === "add_to_cart") {
+    } else if (row.eventType === "add_to_cart") {
       entry.conversions += row._count.id;
     }
     countMap.set(row.variantId, entry);

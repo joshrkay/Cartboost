@@ -82,9 +82,9 @@ describe("getABTestStats", () => {
     mockDb.aBTest.findUnique.mockResolvedValue(MOCK_TEST);
     mockDb.barEvent.groupBy.mockImplementation(
       makeGroupByMock({
-        "v-a": { impression: 6, conversion: 2 },
-        "v-b": { impression: 5, conversion: 3 },
-        "v-c": { impression: 0, conversion: 0 },
+        "v-a": { impression: 6, add_to_cart: 2 },
+        "v-b": { impression: 5, add_to_cart: 3 },
+        "v-c": { impression: 0, add_to_cart: 0 },
       })
     );
     const result = await getABTestStats("test-id-123");
@@ -128,12 +128,11 @@ describe("getABTestStats", () => {
     mockDb.aBTest.findUnique.mockResolvedValue(MOCK_TEST);
     mockDb.barEvent.groupBy.mockResolvedValue([
       { variantId: "v-a", eventType: "impression", _count: { id: 100 } },
-      { variantId: "v-a", eventType: "conversion", _count: { id: 3 } },
-      { variantId: "v-a", eventType: "add_to_cart", _count: { id: 2 } },
+      { variantId: "v-a", eventType: "add_to_cart", _count: { id: 5 } },
     ]);
     const result = await getABTestStats("test-id-123");
     const varA = result.find(v => v.variant === "A")!;
-    expect(varA.conversions).toBe(5); // 3 + 2
+    expect(varA.conversions).toBe(5);
   });
 
   // --- Confidence z-test tests ---
@@ -142,9 +141,9 @@ describe("getABTestStats", () => {
     mockDb.aBTest.findUnique.mockResolvedValue(MOCK_TEST);
     mockDb.barEvent.groupBy.mockImplementation(
       makeGroupByMock({
-        "v-a": { impression: 1000, conversion: 50 },
-        "v-b": { impression: 1000, conversion: 80 },
-        "v-c": { impression: 10, conversion: 1 },
+        "v-a": { impression: 1000, add_to_cart: 50 },
+        "v-b": { impression: 1000, add_to_cart: 80 },
+        "v-c": { impression: 10, add_to_cart: 1 },
       })
     );
     const result = await getABTestStats("test-id-123");
@@ -160,9 +159,9 @@ describe("getABTestStats", () => {
     mockDb.aBTest.findUnique.mockResolvedValue(MOCK_TEST);
     mockDb.barEvent.groupBy.mockImplementation(
       makeGroupByMock({
-        "v-a": { impression: 100, conversion: 10 },
-        "v-b": { impression: 100, conversion: 10 },
-        "v-c": { impression: 100, conversion: 10 },
+        "v-a": { impression: 100, add_to_cart: 10 },
+        "v-b": { impression: 100, add_to_cart: 10 },
+        "v-c": { impression: 100, add_to_cart: 10 },
       })
     );
     const result = await getABTestStats("test-id-123");
@@ -178,9 +177,9 @@ describe("getABTestStats", () => {
     // Control: 5% CR, Variant B: 15% CR — large effect, large sample
     mockDb.barEvent.groupBy.mockImplementation(
       makeGroupByMock({
-        "v-a": { impression: 200, conversion: 10 },
-        "v-b": { impression: 200, conversion: 30 },
-        "v-c": { impression: 200, conversion: 10 },
+        "v-a": { impression: 200, add_to_cart: 10 },
+        "v-b": { impression: 200, add_to_cart: 30 },
+        "v-c": { impression: 200, add_to_cart: 10 },
       })
     );
     const result = await getABTestStats("test-id-123");
@@ -195,9 +194,9 @@ describe("getABTestStats", () => {
     // Control: 15% CR, Variant B: 5% CR — negative lift
     mockDb.barEvent.groupBy.mockImplementation(
       makeGroupByMock({
-        "v-a": { impression: 200, conversion: 30 },
-        "v-b": { impression: 200, conversion: 10 },
-        "v-c": { impression: 200, conversion: 30 },
+        "v-a": { impression: 200, add_to_cart: 30 },
+        "v-b": { impression: 200, add_to_cart: 10 },
+        "v-c": { impression: 200, add_to_cart: 30 },
       })
     );
     const result = await getABTestStats("test-id-123");
@@ -210,9 +209,9 @@ describe("getABTestStats", () => {
     mockDb.aBTest.findUnique.mockResolvedValue(MOCK_TEST);
     mockDb.barEvent.groupBy.mockImplementation(
       makeGroupByMock({
-        "v-a": { impression: 100, conversion: 5 },
-        "v-b": { impression: 3, conversion: 1 },
-        "v-c": { impression: 0, conversion: 0 },
+        "v-a": { impression: 100, add_to_cart: 5 },
+        "v-b": { impression: 3, add_to_cart: 1 },
+        "v-c": { impression: 0, add_to_cart: 0 },
       })
     );
     const result = await getABTestStats("test-id-123");
@@ -237,9 +236,9 @@ describe("getABTestStats", () => {
     // Small samples, similar rates — low confidence
     mockDb.barEvent.groupBy.mockImplementation(
       makeGroupByMock({
-        "v-a": { impression: 20, conversion: 2 },
-        "v-b": { impression: 20, conversion: 3 },
-        "v-c": { impression: 20, conversion: 2 },
+        "v-a": { impression: 20, add_to_cart: 2 },
+        "v-b": { impression: 20, add_to_cart: 3 },
+        "v-c": { impression: 20, add_to_cart: 2 },
       })
     );
     const result = await getABTestStats("test-id-123");

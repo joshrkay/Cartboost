@@ -274,7 +274,7 @@ export default function Index() {
                                                                                               >
                                                                                               Edit Theme Bar
                                                                             </Button>
-                                                                            <Button variant="plain" icon={ClockIcon}>View Test History</Button>
+                                                                            <Button variant="plain" icon={ClockIcon} url="/app/experiments/new">Manage Experiment</Button>
                                                             </BlockStack>
                                               </Card>
                                   </BlockStack>
