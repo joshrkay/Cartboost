@@ -3,7 +3,7 @@ import db from "../db.server";
 
 const mockDb = db as any;
 
-const VALID_EVENT_TYPES = ["impression", "click", "add_to_cart", "conversion"];
+const VALID_EVENT_TYPES = ["impression", "add_to_cart"];
 const VALID_CUID_PATTERN = /^[a-z0-9]{20,30}$/;
 
 /**
@@ -151,17 +151,17 @@ describe("track-event API", () => {
       });
     });
 
-    it("writes correct data with variantId for conversion event", () => {
+    it("writes correct data with variantId for add_to_cart event", () => {
       mockDb.barEvent.create.mockResolvedValue({});
       validateAndTrack(
-        { variantId: VALID_VARIANT_ID, eventType: "conversion" },
+        { variantId: VALID_VARIANT_ID, eventType: "add_to_cart" },
         "test.myshopify.com",
         { id: VALID_VARIANT_ID, test: { shop: "test.myshopify.com" } },
       );
       expect(mockDb.barEvent.create).toHaveBeenCalledWith({
         data: {
           variantId: VALID_VARIANT_ID,
-          eventType: "conversion",
+          eventType: "add_to_cart",
         },
       });
     });

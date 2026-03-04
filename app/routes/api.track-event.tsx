@@ -3,7 +3,7 @@ import { authenticate } from "../shopify.server";
 import db from "../db.server";
 import { checkRateLimit } from "../utils/rate-limiter.server";
 
-const VALID_EVENT_TYPES = ["impression", "click", "add_to_cart", "conversion"];
+const VALID_EVENT_TYPES = ["impression", "add_to_cart"];
 const VALID_CUID_PATTERN = /^[a-z0-9]{20,30}$/;
 
 export const action = async ({ request }: ActionFunctionArgs) => {

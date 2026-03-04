@@ -44,9 +44,9 @@ describe("analytics.server", () => {
     // Control: 5% CR, B: 15% CR, C: ~33% CR — strong effects with enough data
     mockDb.barEvent.groupBy.mockImplementation(
       makeGroupByMock({
-        "v-a": { impression: 200, conversion: 10 },
-        "v-b": { impression: 200, conversion: 30 },
-        "v-c": { impression: 200, conversion: 10 },
+        "v-a": { impression: 200, add_to_cart: 10 },
+        "v-b": { impression: 200, add_to_cart: 30 },
+        "v-c": { impression: 200, add_to_cart: 10 },
       })
     );
     const stats = await getABTestStats(mockTestId);

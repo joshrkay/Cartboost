@@ -16,7 +16,7 @@ export default function Privacy() {
       color: "#333"
     }}>
       <h1>Privacy Policy</h1>
-      <p><strong>Last updated: February 25, 2026</strong></p>
+      <p><strong>Last updated: March 4, 2026</strong></p>
 
       <p>CartBoost (&quot;we&quot;, &quot;us&quot;, or &quot;our&quot;) operates the CartBoost Free Shipping Bar app (the &quot;App&quot;) for the Shopify platform. This Privacy Policy explains how we collect, use, store, and protect information when merchants install and use our App.</p>
 
@@ -69,7 +69,12 @@ export default function Privacy() {
       </ul>
 
       <h2>6. Cookies and Tracking</h2>
-      <p>The CartBoost storefront widget does not set cookies or use browser storage (localStorage, sessionStorage) on your customers' devices. Variant assignment is randomized on each page load and is not persisted.</p>
+      <p>The CartBoost storefront widget sets two cookies on your customers' devices for A/B testing purposes:</p>
+      <ul>
+        <li><strong>cartboost_variant</strong> - Stores the assigned A/B test variant index so the customer sees a consistent experience across page loads. Contains only a numeric index (e.g., "0" or "1"). Expires after 30 days.</li>
+        <li><strong>cartboost_vid</strong> - A randomly generated anonymous visitor identifier used to deduplicate analytics events. Contains no personal information. Expires after 30 days.</li>
+      </ul>
+      <p>These cookies are first-party, set via JavaScript on the merchant's domain. They contain no personal information, are not shared with third parties, and are used solely to ensure consistent A/B test experiences and accurate analytics. We do not use localStorage, sessionStorage, or any other browser storage mechanisms.</p>
 
       <h2>7. Your Rights</h2>
       <p>Depending on your jurisdiction, you may have the following rights regarding your data:</p>
