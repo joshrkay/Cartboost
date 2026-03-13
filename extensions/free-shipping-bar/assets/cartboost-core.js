@@ -103,9 +103,11 @@ function selectVariantConfig(tier, testMode, variants, variantIndex, defaultColo
   if (testMode === 'same_message') {
     bgColor = colors[variantIndex] || defaultColor;
   } else if (testMode === 'random_message_random_color') {
-    bgColor = colors[Math.floor(Math.random() * colors.length)] || defaultColor;
-    belowMessage = belowMessages[Math.floor(Math.random() * belowMessages.length)] || defaultBelow;
-    unlockedMessage = unlockedMessages[Math.floor(Math.random() * unlockedMessages.length)] || defaultUnlocked;
+    // Use variantIndex for deterministic per-visitor selection so each visitor
+    // sees a consistent experience across page loads (required for valid A/B testing).
+    bgColor = colors[variantIndex % colors.length] || defaultColor;
+    belowMessage = belowMessages[variantIndex % belowMessages.length] || defaultBelow;
+    unlockedMessage = unlockedMessages[variantIndex % unlockedMessages.length] || defaultUnlocked;
   } else if (testMode === 'paired') {
     bgColor = colors[variantIndex] || defaultColor;
     belowMessage = belowMessages[variantIndex] || defaultBelow;

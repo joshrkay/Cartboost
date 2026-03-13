@@ -38,7 +38,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         const plan = shopPlan?.plan ?? "free";
         const limits = PLAN_LIMITS[plan] ?? PLAN_LIMITS.free;
 
-        const variants = test.variants.map((v: any) => ({
+        const variants = test.variants.map((v) => ({
             id: v.id,
             name: v.name,
             config: v.config,

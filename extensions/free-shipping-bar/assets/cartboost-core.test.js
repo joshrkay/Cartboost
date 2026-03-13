@@ -174,13 +174,11 @@ describe("selectVariantConfig", () => {
     expect(result.unlockedMessage).toBe("unlock-c");
   });
 
-  it("uses random selection for random_message_random_color mode", () => {
-    vi.spyOn(Math, "random").mockReturnValue(0.0);
+  it("uses variantIndex for deterministic selection in random_message_random_color mode", () => {
     const result = selectVariantConfig("premium", "random_message_random_color", variants, 1, "#000", "default below", "default unlocked");
-    expect(result.bgColor).toBe("#111");
-    expect(result.belowMessage).toBe("msg-a");
-    expect(result.unlockedMessage).toBe("unlock-a");
-    vi.restoreAllMocks();
+    expect(result.bgColor).toBe("#222");
+    expect(result.belowMessage).toBe("msg-b");
+    expect(result.unlockedMessage).toBe("unlock-b");
   });
 
   it("falls back to defaults when variant arrays are empty", () => {

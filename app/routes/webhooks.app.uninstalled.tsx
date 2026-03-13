@@ -1,20 +1,12 @@
 import type { ActionFunctionArgs } from "react-router";
 import { authenticate } from "../shopify.server";
-import db from "../db.server";
+import { deleteAllShopData } from "../models/shop-data.server";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
   const { shop } = await authenticate.webhook(request);
 
-  // Webhook requests can trigger multiple times and after an app has already been uninstalled.
-  // Delete all app data for this shop. ABVariant -> BarEvent cascade via onDelete: Cascade.
-  // This is idempotent — safe to run multiple times if Shopify retries.
   try {
-    await db.$transaction([
-      db.aBTest.deleteMany({ where: { shop } }),
-      db.shopPlan.deleteMany({ where: { shop } }),
-      db.session.deleteMany({ where: { shop } }),
-    ]);
-
+    await deleteAllShopData(shop);
     return new Response(null, { status: 200 });
   } catch (error) {
     console.error("App uninstall cleanup failed", {

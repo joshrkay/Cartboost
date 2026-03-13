@@ -132,7 +132,7 @@ export function getDateRangeLabel(rangeKey: string): string {
 
 export function computeDateRange(rangeKey: string): DateRange {
   const now = new Date();
-  const to = now;
+  const to = new Date(now);
   let from: Date;
 
   switch (rangeKey) {
@@ -195,14 +195,22 @@ export async function purgeExpiredSessions(): Promise<number> {
   return result.count;
 }
 
+interface ABTestWithVariants {
+  id: string;
+  variants: { id: string; name: string; config: unknown }[];
+}
+
 export async function getABTestStats(
-  testId: string,
+  testIdOrTest: string | ABTestWithVariants,
   dateRange?: DateRange,
 ): Promise<VariantStat[]> {
-  const test = await db.aBTest.findUnique({
-    where: { id: testId },
-    include: { variants: true },
-  });
+  const test: ABTestWithVariants | null =
+    typeof testIdOrTest === "string"
+      ? await db.aBTest.findUnique({
+          where: { id: testIdOrTest },
+          include: { variants: true },
+        })
+      : testIdOrTest;
   if (!test) return [];
 
   const dateFilter = dateRange

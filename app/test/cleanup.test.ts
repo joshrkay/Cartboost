@@ -76,10 +76,11 @@ describe("GET /api/cleanup", () => {
   });
 
   function makeRequest(secret?: string) {
-    const url = secret
-      ? `http://localhost/api/cleanup?secret=${secret}`
-      : "http://localhost/api/cleanup";
-    return new Request(url);
+    const headers: Record<string, string> = {};
+    if (secret) {
+      headers["Authorization"] = `Bearer ${secret}`;
+    }
+    return new Request("http://localhost/api/cleanup", { headers });
   }
 
   it("returns 401 when secret is missing", async () => {
