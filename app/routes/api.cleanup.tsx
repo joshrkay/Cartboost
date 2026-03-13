@@ -5,7 +5,7 @@ import { purgeExpiredEvents, purgeExpiredSessions } from "../models/analytics.se
  * Cron-triggered cleanup endpoint. Purges old BarEvent records and expired sessions.
  *
  * Secured via a shared secret in the CLEANUP_SECRET env var.
- * Call: GET /api/cleanup?secret=<CLEANUP_SECRET>
+ * Call: GET /api/cleanup with header `Authorization: Bearer <CLEANUP_SECRET>`
  *
  * Can be triggered by Vercel Cron, GitHub Actions, or any external scheduler.
  */
@@ -18,8 +18,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     );
   }
 
-  const url = new URL(request.url);
-  const secret = url.searchParams.get("secret");
+  const authHeader = request.headers.get("Authorization") ?? "";
+  const secret = authHeader.startsWith("Bearer ")
+    ? authHeader.slice(7)
+    : null;
 
   if (secret !== expectedSecret) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
