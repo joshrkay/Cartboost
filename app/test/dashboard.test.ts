@@ -9,6 +9,7 @@ vi.mock("../models/analytics.server", () => ({
   getABTestStats: vi.fn(),
   computeDateRange: vi.fn().mockReturnValue({ from: new Date(), to: new Date() }),
   getDateRangeLabel: vi.fn().mockReturnValue("Last 7 days"),
+  updateTestMode: vi.fn(),
 }));
 
 vi.mock("../shopify.server", () => ({
@@ -189,7 +190,7 @@ describe("dashboard loader — failure fallback (actual loader)", () => {
   it("preserves paid plan when getABTestStats throws", async () => {
     mockShop("shop.myshopify.com");
     mockDb.shopPlan.findUnique.mockResolvedValue({ plan: "premium" });
-    mockGetOrCreateABTest.mockResolvedValue({ id: "test-1", shop: "shop.myshopify.com", variants: [] });
+    mockGetOrCreateABTest.mockResolvedValue({ id: "test-1", shop: "shop.myshopify.com", name: "Test", mode: "manual", variants: [] });
     mockGetABTestStats.mockRejectedValue(new Error("Query timeout"));
 
     const data = await loader({ request: makeRequest(), context: {}, params: {}, unstable_pattern: "" });
@@ -199,7 +200,7 @@ describe("dashboard loader — failure fallback (actual loader)", () => {
 
   it("falls back to free plan when shopPlan query throws", async () => {
     mockShop("shop.myshopify.com");
-    mockGetOrCreateABTest.mockResolvedValue({ id: "test-1", shop: "shop.myshopify.com", variants: [] });
+    mockGetOrCreateABTest.mockResolvedValue({ id: "test-1", shop: "shop.myshopify.com", name: "Test", mode: "manual", variants: [] });
     mockGetABTestStats.mockResolvedValue([]);
     mockDb.shopPlan.findUnique.mockRejectedValue(new Error("Table not found"));
 
@@ -211,7 +212,7 @@ describe("dashboard loader — failure fallback (actual loader)", () => {
   it("returns real data when all queries succeed", async () => {
     mockShop("shop.myshopify.com");
     const fakeVariants = [{ id: "v1", variant: "A", visitors: 100, conversions: 10 }];
-    mockGetOrCreateABTest.mockResolvedValue({ id: "test-1", shop: "shop.myshopify.com", variants: [] });
+    mockGetOrCreateABTest.mockResolvedValue({ id: "test-1", shop: "shop.myshopify.com", name: "Test", mode: "manual", variants: [] });
     mockGetABTestStats.mockResolvedValue(fakeVariants);
     mockDb.shopPlan.findUnique.mockResolvedValue({ plan: "pro" });
 
@@ -235,7 +236,7 @@ describe("dashboard — zero state vs populated state (regression)", () => {
   it("returns variants.length === 0 for a brand-new shop with no experiments (triggers empty state)", async () => {
     mockShop("new-merchant.myshopify.com");
     mockDb.shopPlan.findUnique.mockResolvedValue(null);
-    mockGetOrCreateABTest.mockResolvedValue({ id: "test-1", shop: "new-merchant.myshopify.com" });
+    mockGetOrCreateABTest.mockResolvedValue({ id: "test-1", shop: "new-merchant.myshopify.com", name: "Test", mode: "manual" });
     mockGetABTestStats.mockResolvedValue([]);
 
     const data = await loader({ request: makeRequest(), context: {}, params: {}, unstable_pattern: "" });
@@ -250,7 +251,7 @@ describe("dashboard — zero state vs populated state (regression)", () => {
       { id: "v1", variant: "A", visitors: 500, conversions: 50, conversionRate: 10, lift: 0, confidence: 0, status: "Control" },
       { id: "v2", variant: "B", visitors: 480, conversions: 72, conversionRate: 15, lift: 50, confidence: 96, status: "Winning" },
     ];
-    mockGetOrCreateABTest.mockResolvedValue({ id: "test-1", shop: "active-merchant.myshopify.com" });
+    mockGetOrCreateABTest.mockResolvedValue({ id: "test-1", shop: "active-merchant.myshopify.com", name: "Test", mode: "manual" });
     mockGetABTestStats.mockResolvedValue(populatedVariants);
 
     const data = await loader({ request: makeRequest(), context: {}, params: {}, unstable_pattern: "" });
@@ -273,7 +274,7 @@ describe("dashboard — zero state vs populated state (regression)", () => {
   it("respects dateRange parameter in both empty and populated states", async () => {
     mockShop("shop.myshopify.com");
     mockDb.shopPlan.findUnique.mockResolvedValue(null);
-    mockGetOrCreateABTest.mockResolvedValue({ id: "test-1", shop: "shop.myshopify.com" });
+    mockGetOrCreateABTest.mockResolvedValue({ id: "test-1", shop: "shop.myshopify.com", name: "Test", mode: "manual" });
     mockGetABTestStats.mockResolvedValue([]);
 
     const data = await loader({ request: makeRequest("?dateRange=last30"), context: {}, params: {}, unstable_pattern: "" });

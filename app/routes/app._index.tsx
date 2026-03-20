@@ -1,4 +1,4 @@
-import type { LoaderFunctionArgs, HeadersFunction } from "react-router";
+import type { LoaderFunctionArgs, ActionFunctionArgs, HeadersFunction } from "react-router";
 import { useLoaderData, useFetcher, useNavigate, isRouteErrorResponse, useRouteError } from "react-router";
 import { authenticate, PLAN_PRICES } from "../shopify.server";
 import { boundary } from "@shopify/shopify-app-react-router/server";
@@ -15,6 +15,7 @@ import {
   Badge,
   Icon,
   Banner,
+  ButtonGroup,
 } from "@shopify/polaris";
 import {
   PersonIcon,
@@ -22,8 +23,16 @@ import {
   CheckIcon,
   ChartLineIcon,
   ClockIcon,
+  CashDollarIcon,
 } from "@shopify/polaris-icons";
-import { getOrCreateABTest, getABTestStats, computeDateRange, getDateRangeLabel, type VariantStat } from "../models/analytics.server";
+import {
+  getOrCreateABTest,
+  getABTestStats,
+  computeDateRange,
+  getDateRangeLabel,
+  updateTestMode,
+  type VariantStat,
+} from "../models/analytics.server";
 import { DashboardEmptyState } from "../components/DashboardEmptyState";
 
 import db from "../db.server";
@@ -36,6 +45,9 @@ import {
 async function loadDashboardData(shop: string, request: Request, dateRangeKey: string) {
   let variants: VariantStat[] = [];
   let currentPlan = "free";
+  let testId: string | null = null;
+  let testName: string | null = null;
+  let testMode = "manual";
 
   try {
     const shopPlan = await db.shopPlan.findUnique({ where: { shop } });
@@ -46,13 +58,16 @@ async function loadDashboardData(shop: string, request: Request, dateRangeKey: s
 
   try {
     const test = await getOrCreateABTest(shop);
+    testId = test.id;
+    testName = test.name;
+    testMode = test.mode;
     const dateRange = computeDateRange(dateRangeKey);
     variants = await getABTestStats(test, dateRange);
   } catch (error) {
     logRequestError("Dashboard data load failed", request, error, { shop });
   }
 
-  return { variants, currentPlan };
+  return { variants, currentPlan, testId, testName, testMode };
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -61,9 +76,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     const shop = session.shop;
     const url = new URL(request.url);
     const dateRangeKey = url.searchParams.get("dateRange") || "last7";
-    const { variants, currentPlan } = await loadDashboardData(shop, request, dateRangeKey);
+    const { variants, currentPlan, testId, testName, testMode } = await loadDashboardData(shop, request, dateRangeKey);
     const dateRangeLabel = getDateRangeLabel(dateRangeKey);
-    return { shop, variants, currentPlan, prices: PLAN_PRICES, dateRange: dateRangeKey, dateRangeLabel };
+    return { shop, variants, currentPlan, prices: PLAN_PRICES, dateRange: dateRangeKey, dateRangeLabel, testId, testName, testMode };
   } catch (error) {
     if (shouldRecoverFromResponseError(error) || !(error instanceof Response)) {
       logRequestError("Dashboard loader authentication failed", request, error);
@@ -75,8 +90,25 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   }
 };
 
+export const action = async ({ request }: ActionFunctionArgs) => {
+  await authenticate.admin(request);
+  const formData = await request.formData();
+  const intent = formData.get("intent") as string;
+
+  if (intent === "toggleMode") {
+    const testId = formData.get("testId") as string;
+    const mode = formData.get("mode") as "manual" | "auto_optimize";
+    if (testId && (mode === "manual" || mode === "auto_optimize")) {
+      await updateTestMode(testId, mode);
+    }
+    return { ok: true };
+  }
+
+  return { ok: false };
+};
+
 export default function Index() {
-  const { shop, variants, currentPlan, prices, dateRange, dateRangeLabel } = useLoaderData<typeof loader>();
+  const { shop, variants, currentPlan, prices, dateRange, dateRangeLabel, testId, testName, testMode } = useLoaderData<typeof loader>();
   const formatPrice = (plan: "pro" | "premium") => `$${prices[plan].amount}/mo`;
   const navigate = useNavigate();
   const fetcher = useFetcher();
@@ -87,6 +119,7 @@ export default function Index() {
 
   const totalVisitors = variants.reduce((sum, v) => sum + v.visitors, 0);
   const totalConversions = variants.reduce((sum, v) => sum + v.conversions, 0);
+  const totalRevenue = variants.reduce((sum, v) => sum + v.revenue, 0);
   const avgCR = totalVisitors > 0 ? (totalConversions / totalVisitors) * 100 : 0;
   const bestLift = variants.length > 0 ? Math.max(...variants.map(v => v.lift)) : 0;
   const leadingVariant = totalVisitors > 0
@@ -97,10 +130,19 @@ export default function Index() {
     fetcher.submit({ plan }, { method: "post", action: "/app/billing" });
   };
 
+  const handleModeToggle = () => {
+    if (!testId) return;
+    const newMode = testMode === "manual" ? "auto_optimize" : "manual";
+    fetcher.submit(
+      { intent: "toggleMode", testId, mode: newMode },
+      { method: "post" },
+    );
+  };
+
   const resourceName = { singular: 'variant', plural: 'variants' };
 
   const rowMarkup = variants.map(
-    ({ id, variant, visitors, conversions, conversionRate, lift, confidence, status }: VariantStat, index: number) => (
+    ({ id, variant, visitors, conversions, conversionRate, lift, confidence, status, orders, revenue }: VariantStat, index: number) => (
       <IndexTable.Row id={id} key={id} position={index}>
         <IndexTable.Cell>
           <Badge tone={
@@ -131,13 +173,49 @@ export default function Index() {
             {confidence >= 95 && <Icon source={CheckIcon} tone="success" />}
           </div>
         </IndexTable.Cell>
+        <IndexTable.Cell>{orders}</IndexTable.Cell>
+        <IndexTable.Cell>${revenue.toLocaleString()}</IndexTable.Cell>
       </IndexTable.Row>
     ),
   );
 
   return (
-    <Page title="CartBoost A/B Analytics" subtitle="Optimize your conversion rates with real-time data experiments.">
+    <Page title="CartBoost A/B Analytics" subtitle={testName ? `Active: ${testName}` : "Optimize your conversion rates with real-time data experiments."}>
       <Layout>
+        {/* Mode toggle for Pro/Premium */}
+        {currentPlan !== "free" && testId && (
+          <Layout.Section>
+            <Card>
+              <InlineStack align="space-between" blockAlign="center">
+                <BlockStack gap="100">
+                  <Text variant="headingSm" as="h3">Optimization Mode</Text>
+                  <Text variant="bodySm" tone="subdued" as="p">
+                    {testMode === "auto_optimize"
+                      ? "Auto-optimize is active — traffic is automatically shifted to winning variants."
+                      : "Manual mode — traffic is split evenly. Switch to auto-optimize to let CartBoost maximize conversions."}
+                  </Text>
+                </BlockStack>
+                <ButtonGroup>
+                  <Button
+                    variant={testMode === "manual" ? "primary" : "secondary"}
+                    onClick={testMode !== "manual" ? handleModeToggle : undefined}
+                    size="slim"
+                  >
+                    Manual
+                  </Button>
+                  <Button
+                    variant={testMode === "auto_optimize" ? "primary" : "secondary"}
+                    onClick={testMode !== "auto_optimize" ? handleModeToggle : undefined}
+                    size="slim"
+                  >
+                    Auto-Optimize
+                  </Button>
+                </ButtonGroup>
+              </InlineStack>
+            </Card>
+          </Layout.Section>
+        )}
+
         <Layout.Section>
           <InlineStack align="space-between">
             <div />
@@ -157,7 +235,7 @@ export default function Index() {
         </Layout.Section>
 
         <Layout.Section>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px' }}>
             <Card>
               <BlockStack gap="200">
                 <InlineStack align="space-between">
@@ -202,6 +280,16 @@ export default function Index() {
                 </Text>
               </BlockStack>
             </Card>
+            <Card>
+              <BlockStack gap="200">
+                <InlineStack align="space-between">
+                  <Text variant="headingSm" as="h3" tone="subdued">Total Revenue</Text>
+                  <Icon source={CashDollarIcon} tone="subdued" />
+                </InlineStack>
+                <Text variant="headingLg" as="p">${totalRevenue.toLocaleString()}</Text>
+                <Text variant="bodySm" tone="subdued" as="p">{dateRangeLabel}</Text>
+              </BlockStack>
+            </Card>
           </div>
         </Layout.Section>
 
@@ -218,6 +306,8 @@ export default function Index() {
                 { title: 'Conv. Rate' },
                 { title: 'Performance Lift' },
                 { title: 'Confidence' },
+                { title: 'Orders' },
+                { title: 'Revenue' },
               ]}
               selectable={false}
             >
@@ -275,7 +365,9 @@ export default function Index() {
                 >
                   Edit Theme Bar
                 </Button>
-                <Button variant="plain" icon={ClockIcon} url="/app/experiments/new">Manage Experiment</Button>
+                <Button variant="plain" icon={ClockIcon} url="/app/experiments">
+                  Manage Experiments
+                </Button>
               </BlockStack>
             </Card>
           </BlockStack>

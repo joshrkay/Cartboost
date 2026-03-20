@@ -1,128 +1,212 @@
 import type { LoaderFunctionArgs, ActionFunctionArgs } from "react-router";
-import { redirect, useLoaderData } from "react-router";
+import { redirect, useLoaderData, useActionData, Form } from "react-router";
 import { authenticate } from "../shopify.server";
-import { getOrCreateABTest } from "../models/analytics.server";
+import { createExperiment, getActiveTest } from "../models/analytics.server";
+import db from "../db.server";
 import {
   Page,
   Layout,
   Card,
   BlockStack,
   Text,
+  TextField,
   Button,
-  List,
   InlineStack,
-  Badge,
+  Banner,
 } from "@shopify/polaris";
+import { useState } from "react";
+
+const DEFAULT_VARIANTS = [
+  { name: "A", color: "#4CAF50", text: "Free shipping over $50" },
+  { name: "B", color: "#2196F3", text: "Limited Time: Free Shipping!" },
+];
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session } = await authenticate.admin(request);
-  const test = await getOrCreateABTest(session.shop);
+  const activeTest = await getActiveTest(session.shop);
+  const shopPlan = await db.shopPlan.findUnique({ where: { shop: session.shop } });
+  const plan = shopPlan?.plan ?? "free";
+  const maxVariants = plan === "premium" ? 5 : plan === "pro" ? 3 : 2;
   return {
     shop: session.shop,
-    testName: test.name,
-    variantCount: test.variants.length,
-    variants: test.variants.map((v: { name: string; config: unknown }) => ({
-      name: v.name,
-      config: v.config as { color?: string; text?: string },
-    })),
+    hasActiveTest: !!activeTest,
+    activeTestName: activeTest?.name ?? null,
+    maxVariants,
   };
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-  await authenticate.admin(request);
-  return redirect("/app");
+  const { session } = await authenticate.admin(request);
+  const formData = await request.formData();
+  const name = formData.get("name") as string;
+  const description = formData.get("description") as string;
+
+  if (!name?.trim()) {
+    return { error: "Experiment name is required" };
+  }
+
+  const variantNames = formData.getAll("variantName") as string[];
+  const variantColors = formData.getAll("variantColor") as string[];
+  const variantTexts = formData.getAll("variantText") as string[];
+
+  const variants = variantNames.map((vName, i) => ({
+    name: vName,
+    config: {
+      color: variantColors[i] || "#4CAF50",
+      text: variantTexts[i] || "",
+    },
+  }));
+
+  if (variants.length === 0) {
+    return { error: "At least one variant is required" };
+  }
+
+  try {
+    const test = await createExperiment(session.shop, {
+      name: name.trim(),
+      description: description?.trim() || undefined,
+      variants,
+    });
+    return redirect(`/app/experiments/${test.id}`);
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Failed to create experiment" };
+  }
 };
 
 export default function NewExperiment() {
-  const { shop, variantCount, variants } = useLoaderData<typeof loader>();
+  const { hasActiveTest, activeTestName, maxVariants } = useLoaderData<typeof loader>();
+  const actionData = useActionData<typeof action>();
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [variants, setVariants] = useState(DEFAULT_VARIANTS.map((v) => ({ ...v })));
+
+  const addVariant = () => {
+    if (variants.length >= maxVariants) return;
+    const letter = String.fromCharCode(65 + variants.length);
+    setVariants([...variants, { name: letter, color: "#666666", text: "" }]);
+  };
+
+  const removeVariant = (index: number) => {
+    if (variants.length <= 1) return;
+    setVariants(variants.filter((_, i) => i !== index));
+  };
+
+  const updateVariant = (index: number, field: "color" | "text", value: string) => {
+    setVariants(variants.map((v, i) => (i === index ? { ...v, [field]: value } : v)));
+  };
 
   return (
-    <Page
-      title="Set Up Your Experiment"
-      backAction={{ url: "/app" }}
-    >
-      <Layout>
-        <Layout.Section>
-          <Card>
-            <BlockStack gap="400">
-              <Badge tone="success">Experiment Ready</Badge>
-              <Text variant="headingLg" as="h2">
-                Your A/B test is configured with {variantCount} variants
-              </Text>
-              <Text as="p" tone="subdued">
-                CartBoost automatically splits your storefront visitors across these variants and tracks which one drives the most add-to-cart actions.
-              </Text>
-              <Card>
-                <BlockStack gap="200">
-                  {variants.map((v: { name: string; config: { color?: string; text?: string } }) => (
-                    <InlineStack key={v.name} gap="300" align="start" blockAlign="center">
-                      <div
-                        style={{
-                          width: "24px",
-                          height: "24px",
-                          borderRadius: "4px",
-                          backgroundColor: v.config?.color ?? "#4CAF50",
-                          flexShrink: 0,
-                        }}
-                      />
-                      <BlockStack gap="050">
-                        <Text variant="bodyMd" fontWeight="bold" as="span">
-                          Variant {v.name}
-                        </Text>
-                        <Text variant="bodySm" tone="subdued" as="span">
-                          {v.config?.text ?? "Default message"}
-                        </Text>
-                      </BlockStack>
-                    </InlineStack>
-                  ))}
-                </BlockStack>
-              </Card>
-            </BlockStack>
-          </Card>
-        </Layout.Section>
+    <Page title="Create New Experiment" backAction={{ url: "/app/experiments" }}>
+      <Form method="post">
+        <Layout>
+          {hasActiveTest && (
+            <Layout.Section>
+              <Banner tone="warning" title="Active experiment exists">
+                <p>
+                  &quot;{activeTestName}&quot; is currently active. It will need to be paused or
+                  completed before this new experiment can go live.
+                </p>
+              </Banner>
+            </Layout.Section>
+          )}
 
-        <Layout.Section variant="oneThird">
-          <BlockStack gap="400">
+          {actionData && "error" in actionData && (
+            <Layout.Section>
+              <Banner tone="critical" title={actionData.error as string} />
+            </Layout.Section>
+          )}
+
+          <Layout.Section>
             <Card>
               <BlockStack gap="400">
-                <Text variant="headingMd" as="h2">Next Steps</Text>
-                <List type="number">
-                  <List.Item>
-                    Open your theme editor and add the <Text fontWeight="bold" as="span">CB Free Shipping Bar</Text> block to your store
-                  </List.Item>
-                  <List.Item>
-                    Customize the bar colors, threshold, and messages
-                  </List.Item>
-                  <List.Item>
-                    Publish your theme — CartBoost starts tracking immediately
-                  </List.Item>
-                </List>
-                <BlockStack gap="200">
-                  <Button
-                    url={`https://${shop}/admin/themes/current/editor`}
-                    target="_blank"
-                    variant="primary"
-                    fullWidth
-                  >
-                    Open Theme Editor
-                  </Button>
-                  <Button url="/app" fullWidth>
-                    Go to Dashboard
-                  </Button>
-                </BlockStack>
+                <TextField
+                  label="Experiment Name"
+                  name="name"
+                  value={name}
+                  onChange={setName}
+                  placeholder="e.g. Holiday Free Shipping Bar Test"
+                  autoComplete="off"
+                />
+                <TextField
+                  label="Description (optional)"
+                  name="description"
+                  value={description}
+                  onChange={setDescription}
+                  multiline={2}
+                  autoComplete="off"
+                />
               </BlockStack>
             </Card>
+          </Layout.Section>
+
+          <Layout.Section>
             <Card>
-              <BlockStack gap="200">
-                <Text variant="headingSm" as="h3">How it works</Text>
-                <Text as="p" tone="subdued">
-                  Each visitor is randomly assigned a variant and sees that same variant on every visit (via a cookie). CartBoost tracks impressions and add-to-cart events, then calculates statistical confidence so you know which variant truly performs best.
-                </Text>
+              <BlockStack gap="400">
+                <InlineStack align="space-between">
+                  <Text variant="headingMd" as="h2">Variants</Text>
+                  {variants.length < maxVariants && (
+                    <Button onClick={addVariant} size="slim">Add Variant</Button>
+                  )}
+                </InlineStack>
+
+                {variants.map((v, index) => (
+                  <Card key={v.name}>
+                    <BlockStack gap="300">
+                      <InlineStack align="space-between">
+                        <Text variant="headingSm" as="h3">
+                          {v.name === "A" ? "Control (A)" : `Variant ${v.name}`}
+                        </Text>
+                        {index > 0 && (
+                          <Button
+                            tone="critical"
+                            variant="plain"
+                            onClick={() => removeVariant(index)}
+                            size="slim"
+                          >
+                            Remove
+                          </Button>
+                        )}
+                      </InlineStack>
+                      <input type="hidden" name="variantName" value={v.name} />
+                      <InlineStack gap="400" wrap>
+                        <div style={{ flex: "0 0 auto" }}>
+                          <label>
+                            <Text variant="bodySm" as="span">Color</Text>
+                            <input
+                              type="color"
+                              name="variantColor"
+                              value={v.color}
+                              onChange={(e) => updateVariant(index, "color", e.target.value)}
+                              style={{ display: "block", width: 48, height: 36, cursor: "pointer", border: "1px solid #ccc", borderRadius: 4 }}
+                            />
+                          </label>
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <TextField
+                            label="Bar Message"
+                            name="variantText"
+                            value={v.text}
+                            onChange={(value) => updateVariant(index, "text", value)}
+                            placeholder="e.g. Add X more for free shipping!"
+                            autoComplete="off"
+                          />
+                        </div>
+                      </InlineStack>
+                    </BlockStack>
+                  </Card>
+                ))}
               </BlockStack>
             </Card>
-          </BlockStack>
-        </Layout.Section>
-      </Layout>
+          </Layout.Section>
+
+          <Layout.Section>
+            <InlineStack align="end" gap="200">
+              <Button url="/app/experiments">Cancel</Button>
+              <Button variant="primary" submit>Create Experiment</Button>
+            </InlineStack>
+          </Layout.Section>
+        </Layout>
+      </Form>
     </Page>
   );
 }

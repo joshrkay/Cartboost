@@ -40,9 +40,12 @@ model ABTest {
   id          String      @id @default(cuid())
   shop        String
   name        String
+  description String?
   status      String      @default("active") // active, paused, completed
+  mode        String      @default("manual") // "manual" | "auto_optimize"
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
+  completedAt DateTime?
   variants    ABVariant[]
 
   @@index([shop])
@@ -63,7 +66,9 @@ model BarEvent {
   id          String    @id @default(cuid())
   variantId   String
   variant     ABVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
-  eventType   String    // "impression" or "add_to_cart"
+  eventType   String    // "impression", "add_to_cart", or "order_completed"
+  revenue     Decimal?  // Only for order_completed events, in shop currency
+  currency    String?   // e.g. "USD"
   createdAt   DateTime  @default(now())
 
   @@index([variantId, eventType])

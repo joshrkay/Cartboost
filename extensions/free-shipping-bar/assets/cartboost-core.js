@@ -163,6 +163,42 @@ function selectThresholdForCurrency(thresholds, activeCurrency, defaultThreshold
   return defaultThreshold;
 }
 
+/**
+ * Select a variant using server-provided weights (for auto-optimize mode).
+ * Uses cumulative distribution for weighted random selection.
+ *
+ * @param {object} weights - Map of variantId → weight (summing to ~1.0)
+ * @param {Array} variants - Array of { id, name } from server
+ * @returns {{ index: number, variantId: string } | null}
+ */
+function selectWeightedVariant(weights, variants) {
+  if (!weights || !variants || variants.length === 0) return null;
+
+  var entries = [];
+  for (var i = 0; i < variants.length; i++) {
+    var w = weights[variants[i].id] || 0;
+    entries.push({ index: i, id: variants[i].id, weight: w });
+  }
+
+  var totalWeight = 0;
+  for (var j = 0; j < entries.length; j++) {
+    totalWeight += entries[j].weight;
+  }
+  if (totalWeight === 0) return null;
+
+  var r = Math.random() * totalWeight;
+  var cumulative = 0;
+  for (var k = 0; k < entries.length; k++) {
+    cumulative += entries[k].weight;
+    if (r <= cumulative) {
+      return { index: entries[k].index, variantId: entries[k].id };
+    }
+  }
+
+  // Fallback to last entry
+  return { index: entries[entries.length - 1].index, variantId: entries[entries.length - 1].id };
+}
+
 // Expose functions on globalThis for both browser and test environments.
 // In the browser, <script> function declarations are already global,
 // but this makes them explicitly available in Node.js/Vitest ESM context too.
@@ -175,6 +211,7 @@ if (typeof globalThis !== 'undefined') {
     shouldDeduplicateEvent: shouldDeduplicateEvent,
     computeProgressPercent: computeProgressPercent,
     selectThresholdForCurrency: selectThresholdForCurrency,
+    selectWeightedVariant: selectWeightedVariant,
     getCookie: getCookie,
     setCookie: setCookie,
   };

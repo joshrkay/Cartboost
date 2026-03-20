@@ -126,6 +126,20 @@
         cbMessageUnlocked = enforcedConfig.unlockedMessage;
         barEl.style.background = enforcedConfig.bgColor;
 
+        // Auto-optimize mode: use server-provided weights for new visitors
+        var serverMode = data.mode || 'manual';
+        var serverWeights = data.weights || null;
+
+        if (serverMode === 'auto_optimize' && serverWeights && assignment.isNew) {
+          var weighted = selectWeightedVariant(serverWeights, variants);
+          if (weighted) {
+            variantIndex = weighted.index;
+            variantLetter = String.fromCharCode(65 + variantIndex);
+            setCookie('cartboost_variant', String(variantIndex), 30);
+            barEl.setAttribute('data-cartboost-variant', variantLetter);
+          }
+        }
+
         var matched;
         if (serverPlan === 'free') {
           matched = variants.length > 0 ? variants[0] : null;
