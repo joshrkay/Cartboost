@@ -1,6 +1,6 @@
 import type { LoaderFunctionArgs } from "react-router";
 import { authenticate } from "../shopify.server";
-import { getOrCreateABTest } from "../models/analytics.server";
+import { getActiveTest, getOrCreateABTest, getVariantWeights } from "../models/analytics.server";
 import { checkRateLimit } from "../utils/rate-limiter.server";
 import db from "../db.server";
 
@@ -19,8 +19,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             return new Response("Unauthorized", { status: 401 });
         }
 
-        // Rate limit is per-shop but all visitors share this bucket,
-        // so the limit must accommodate storefront traffic volume.
         const { allowed } = checkRateLimit(`variants:${session.shop}`, {
             limit: 10_000,
             windowMs: 60_000,
@@ -30,11 +28,13 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             return Response.json({ error: "Too Many Requests" }, { status: 429 });
         }
 
-        const [test, shopPlan] = await Promise.all([
-            getOrCreateABTest(session.shop),
-            db.shopPlan.findUnique({ where: { shop: session.shop } }),
-        ]);
+        // Try active test first; fall back to auto-create for backward compat
+        let test = await getActiveTest(session.shop);
+        if (!test) {
+            test = await getOrCreateABTest(session.shop);
+        }
 
+        const shopPlan = await db.shopPlan.findUnique({ where: { shop: session.shop } });
         const plan = shopPlan?.plan ?? "free";
         const limits = PLAN_LIMITS[plan] ?? PLAN_LIMITS.free;
 
@@ -44,11 +44,19 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             config: v.config,
         }));
 
+        // Compute weights for auto-optimize mode (Pro/Premium only)
+        let weights: Record<string, number> | undefined;
+        if (test.mode === "auto_optimize" && plan !== "free") {
+            weights = await getVariantWeights(test.id);
+        }
+
         return Response.json({
             variants,
             plan,
             maxVariants: limits.maxVariants,
             allowedTestModes: limits.allowedTestModes,
+            mode: test.mode,
+            ...(weights ? { weights } : {}),
         });
     } catch (error) {
         console.error("Variants API error", {

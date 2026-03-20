@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import db from "../db.server";
-import { getOrCreateABTest, getABTestStats } from "../models/analytics.server";
+import { getOrCreateABTest, getABTestStats, sampleBeta, computeVariantWeights } from "../models/analytics.server";
 
 const mockDb = db as any;
 
@@ -8,6 +8,7 @@ const MOCK_TEST = {
   id: "test-id-123",
   shop: "test-shop.myshopify.com",
   name: "Initial Free Shipping Bar Test",
+  mode: "manual",
   variants: [
     { id: "v-a", name: "A", config: { color: "#4CAF50", text: "Free shipping over $50" } },
     { id: "v-b", name: "B", config: { color: "#2196F3", text: "Limited Time: Free Shipping!" } },
@@ -16,10 +17,16 @@ const MOCK_TEST = {
 };
 
 function makeGroupByMock(data: Record<string, Record<string, number>>) {
-  return () => {
+  // Returns a function that handles both event count and revenue groupBy calls
+  return (args: any) => {
+    // Second call is for revenue (has eventType: "order_completed" filter)
+    if (args?.where?.eventType === "order_completed") {
+      return Promise.resolve([]);
+    }
+    // First call: event counts
     const rows: Array<{ variantId: string; eventType: string; _count: { id: number } }> = [];
     for (const [variantId, events] of Object.entries(data)) {
-      for (const [eventType, count] of Object.entries(events)) {
+      for (const [eventType, count] of Object.entries(events as Record<string, number>)) {
         if (count > 0) {
           rows.push({ variantId, eventType, _count: { id: count } });
         }
@@ -108,14 +115,17 @@ describe("getABTestStats", () => {
       expect(v.visitors).toBe(0);
       expect(v.conversions).toBe(0);
       expect(v.conversionRate).toBe(0);
+      expect(v.orders).toBe(0);
+      expect(v.revenue).toBe(0);
     });
   });
 
-  it("uses a single groupBy query instead of per-variant counts", async () => {
+  it("uses groupBy queries for event counts and revenue", async () => {
     mockDb.aBTest.findUnique.mockResolvedValue(MOCK_TEST);
     mockDb.barEvent.groupBy.mockResolvedValue([]);
     await getABTestStats("test-id-123");
-    expect(mockDb.barEvent.groupBy).toHaveBeenCalledTimes(1);
+    // Called twice: once for event counts, once for revenue
+    expect(mockDb.barEvent.groupBy).toHaveBeenCalledTimes(2);
     expect(mockDb.barEvent.groupBy).toHaveBeenCalledWith(
       expect.objectContaining({
         by: ["variantId", "eventType"],
@@ -126,10 +136,13 @@ describe("getABTestStats", () => {
 
   it("includes add_to_cart events in conversions count", async () => {
     mockDb.aBTest.findUnique.mockResolvedValue(MOCK_TEST);
-    mockDb.barEvent.groupBy.mockResolvedValue([
-      { variantId: "v-a", eventType: "impression", _count: { id: 100 } },
-      { variantId: "v-a", eventType: "add_to_cart", _count: { id: 5 } },
-    ]);
+    mockDb.barEvent.groupBy.mockImplementation((args: any) => {
+      if (args?.where?.eventType === "order_completed") return Promise.resolve([]);
+      return Promise.resolve([
+        { variantId: "v-a", eventType: "impression", _count: { id: 100 } },
+        { variantId: "v-a", eventType: "add_to_cart", _count: { id: 5 } },
+      ]);
+    });
     const result = await getABTestStats("test-id-123");
     const varA = result.find(v => v.variant === "A")!;
     expect(varA.conversions).toBe(5);
@@ -223,7 +236,7 @@ describe("getABTestStats", () => {
 
   it("status is Collecting for all non-control variants when no events", async () => {
     mockDb.aBTest.findUnique.mockResolvedValue(MOCK_TEST);
-    mockDb.barEvent.groupBy.mockResolvedValue([]);
+    mockDb.barEvent.groupBy.mockImplementation(() => Promise.resolve([]));
     const result = await getABTestStats("test-id-123");
     const varA = result.find(v => v.variant === "A")!;
     const varB = result.find(v => v.variant === "B")!;
@@ -245,5 +258,107 @@ describe("getABTestStats", () => {
     const varB = result.find(v => v.variant === "B")!;
     expect(varB.confidence).toBeLessThan(70);
     expect(varB.status).toBe("Stable");
+  });
+
+  it("includes revenue data in variant stats", async () => {
+    mockDb.aBTest.findUnique.mockResolvedValue(MOCK_TEST);
+    mockDb.barEvent.groupBy.mockImplementation((args: any) => {
+      if (args?.where?.eventType === "order_completed") {
+        return Promise.resolve([
+          { variantId: "v-a", _sum: { revenue: 100 }, _count: { id: 2 } },
+          { variantId: "v-b", _sum: { revenue: 250 }, _count: { id: 5 } },
+        ]);
+      }
+      return Promise.resolve([
+        { variantId: "v-a", eventType: "impression", _count: { id: 100 } },
+        { variantId: "v-a", eventType: "add_to_cart", _count: { id: 10 } },
+        { variantId: "v-a", eventType: "order_completed", _count: { id: 2 } },
+        { variantId: "v-b", eventType: "impression", _count: { id: 100 } },
+        { variantId: "v-b", eventType: "add_to_cart", _count: { id: 15 } },
+        { variantId: "v-b", eventType: "order_completed", _count: { id: 5 } },
+      ]);
+    });
+    const result = await getABTestStats("test-id-123");
+    const varA = result.find(v => v.variant === "A")!;
+    const varB = result.find(v => v.variant === "B")!;
+    expect(varA.revenue).toBe(100);
+    expect(varA.orders).toBe(2);
+    expect(varB.revenue).toBe(250);
+    expect(varB.orders).toBe(5);
+    expect(varB.revenueLift).toBe(150); // (250-100)/100 * 100
+  });
+});
+
+describe("sampleBeta", () => {
+  it("returns values between 0 and 1", () => {
+    for (let i = 0; i < 100; i++) {
+      const sample = sampleBeta(2, 5);
+      expect(sample).toBeGreaterThanOrEqual(0);
+      expect(sample).toBeLessThanOrEqual(1);
+    }
+  });
+
+  it("returns 0.5 for invalid parameters", () => {
+    expect(sampleBeta(0, 1)).toBe(0.5);
+    expect(sampleBeta(-1, 2)).toBe(0.5);
+    expect(sampleBeta(1, 0)).toBe(0.5);
+  });
+
+  it("handles alpha and beta both <= 1 (Jöhnk algorithm)", () => {
+    for (let i = 0; i < 50; i++) {
+      const sample = sampleBeta(0.5, 0.5);
+      expect(sample).toBeGreaterThanOrEqual(0);
+      expect(sample).toBeLessThanOrEqual(1);
+    }
+  });
+
+  it("handles large alpha and beta (gamma-based)", () => {
+    for (let i = 0; i < 50; i++) {
+      const sample = sampleBeta(10, 20);
+      expect(sample).toBeGreaterThanOrEqual(0);
+      expect(sample).toBeLessThanOrEqual(1);
+    }
+  });
+});
+
+describe("computeVariantWeights", () => {
+  it("returns empty object for empty stats", () => {
+    expect(computeVariantWeights([])).toEqual({});
+  });
+
+  it("returns weights summing to approximately 1", () => {
+    const stats = [
+      { id: "v-a", variant: "A", color: "#000", visitors: 100, conversions: 10, conversionRate: 10, lift: 0, confidence: 0, status: "Control", orders: 0, revenue: 0, revenueLift: 0 },
+      { id: "v-b", variant: "B", color: "#000", visitors: 100, conversions: 20, conversionRate: 20, lift: 100, confidence: 90, status: "Promising", orders: 0, revenue: 0, revenueLift: 0 },
+    ];
+    const weights = computeVariantWeights(stats);
+    const total = Object.values(weights).reduce((s, w) => s + w, 0);
+    expect(total).toBeCloseTo(1, 1);
+  });
+
+  it("enforces exploration floor", () => {
+    const stats = [
+      { id: "v-a", variant: "A", color: "#000", visitors: 1000, conversions: 10, conversionRate: 1, lift: 0, confidence: 0, status: "Control", orders: 0, revenue: 0, revenueLift: 0 },
+      { id: "v-b", variant: "B", color: "#000", visitors: 1000, conversions: 500, conversionRate: 50, lift: 4900, confidence: 99, status: "Winning", orders: 0, revenue: 0, revenueLift: 0 },
+    ];
+    const weights = computeVariantWeights(stats, 0.2);
+    // Each variant should get at least 10% (0.2 / 2)
+    expect(weights["v-a"]).toBeGreaterThanOrEqual(0.1);
+    expect(weights["v-b"]).toBeGreaterThanOrEqual(0.1);
+  });
+
+  it("gives higher weight to better-converting variant on average", () => {
+    const stats = [
+      { id: "v-a", variant: "A", color: "#000", visitors: 1000, conversions: 50, conversionRate: 5, lift: 0, confidence: 0, status: "Control", orders: 0, revenue: 0, revenueLift: 0 },
+      { id: "v-b", variant: "B", color: "#000", visitors: 1000, conversions: 200, conversionRate: 20, lift: 300, confidence: 99, status: "Winning", orders: 0, revenue: 0, revenueLift: 0 },
+    ];
+    // Run multiple times and check average
+    let bHigherCount = 0;
+    for (let i = 0; i < 100; i++) {
+      const weights = computeVariantWeights(stats);
+      if (weights["v-b"] > weights["v-a"]) bHigherCount++;
+    }
+    // With such a large difference, B should almost always get more weight
+    expect(bHigherCount).toBeGreaterThan(80);
   });
 });

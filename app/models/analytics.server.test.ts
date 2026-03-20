@@ -16,10 +16,14 @@ const MOCK_TEST = {
 };
 
 function makeGroupByMock(data: Record<string, Record<string, number>>) {
-  return () => {
+  return (args: any) => {
+    // Second call is for revenue (has eventType: "order_completed" filter)
+    if (args?.where?.eventType === "order_completed") {
+      return Promise.resolve([]);
+    }
     const rows: Array<{ variantId: string; eventType: string; _count: { id: number } }> = [];
     for (const [variantId, events] of Object.entries(data)) {
-      for (const [eventType, count] of Object.entries(events)) {
+      for (const [eventType, count] of Object.entries(events as Record<string, number>)) {
         if (count > 0) {
           rows.push({ variantId, eventType, _count: { id: count } });
         }
@@ -60,7 +64,7 @@ describe("analytics.server", () => {
 
   it("should show zeros and Collecting status when no events recorded", async () => {
     mockDb.aBTest.findUnique.mockResolvedValue(MOCK_TEST);
-    mockDb.barEvent.groupBy.mockResolvedValue([]);
+    mockDb.barEvent.groupBy.mockImplementation(() => Promise.resolve([]));
     const stats = await getABTestStats(mockTestId);
     expect(stats[0].conversionRate).toBe(0);
     expect(stats[0].lift).toBe(0);
