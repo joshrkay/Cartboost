@@ -26,6 +26,7 @@ function statusBadgeTone(status: string) {
     case "active": return "success" as const;
     case "paused": return "warning" as const;
     case "completed": return "info" as const;
+    case "scheduled": return "attention" as const;
     default: return undefined;
   }
 }

@@ -50,6 +50,8 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       mode: test.mode,
       createdAt: test.createdAt.toISOString(),
       completedAt: test.completedAt?.toISOString() ?? null,
+      startAt: test.startAt?.toISOString() ?? null,
+      endAt: test.endAt?.toISOString() ?? null,
     },
     variants,
     dateRange: dateRangeKey,
@@ -107,6 +109,11 @@ export default function ExperimentDetail() {
       { content: "Resume", onAction: () => handleStatusChange("active") },
       { content: "Complete", onAction: () => handleStatusChange("completed"), destructive: true },
     );
+  } else if (test.status === "scheduled") {
+    statusActions.push(
+      { content: "Activate Now", onAction: () => handleStatusChange("active") },
+      { content: "Cancel", onAction: () => handleStatusChange("completed"), destructive: true },
+    );
   }
 
   const rowMarkup = variants.map(
@@ -161,12 +168,22 @@ export default function ExperimentDetail() {
       ]}
       additionalMetadata={
         <InlineStack gap="200">
-          <Badge tone={test.status === "active" ? "success" : test.status === "paused" ? "warning" : "info"}>
+          <Badge tone={test.status === "active" ? "success" : test.status === "paused" ? "warning" : test.status === "scheduled" ? "attention" : "info"}>
             {test.status}
           </Badge>
           <Badge tone={test.mode === "auto_optimize" ? "magic" : undefined}>
             {test.mode === "auto_optimize" ? "Auto-Optimize" : "Manual"}
           </Badge>
+          {test.startAt && (
+            <Badge tone="info">
+              {`Starts: ${new Date(test.startAt).toLocaleDateString()}`}
+            </Badge>
+          )}
+          {test.endAt && (
+            <Badge tone="info">
+              {`Ends: ${new Date(test.endAt).toLocaleDateString()}`}
+            </Badge>
+          )}
         </InlineStack>
       }
     >

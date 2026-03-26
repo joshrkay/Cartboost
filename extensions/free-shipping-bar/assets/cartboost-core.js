@@ -199,6 +199,34 @@ function selectWeightedVariant(weights, variants) {
   return { index: entries[entries.length - 1].index, variantId: entries[entries.length - 1].id };
 }
 
+/**
+ * Detect the current device type based on screen width.
+ *
+ * @returns {"mobile" | "desktop"}
+ */
+function detectDeviceType() {
+  if (typeof window !== 'undefined' && window.innerWidth < 768) {
+    return 'mobile';
+  }
+  return 'desktop';
+}
+
+/**
+ * Filter variants by device target.
+ * Variants with deviceTarget "all" or undefined/missing are always included.
+ *
+ * @param {Array} variants - Array of { id, name, config: { deviceTarget?: string } }
+ * @param {string} deviceType - "mobile" or "desktop"
+ * @returns {Array} Filtered variants
+ */
+function filterVariantsByDevice(variants, deviceType) {
+  if (!variants || !deviceType) return variants || [];
+  return variants.filter(function(v) {
+    var target = v.config && v.config.deviceTarget;
+    return !target || target === 'all' || target === deviceType;
+  });
+}
+
 // Expose functions on globalThis for both browser and test environments.
 // In the browser, <script> function declarations are already global,
 // but this makes them explicitly available in Node.js/Vitest ESM context too.
@@ -212,6 +240,8 @@ if (typeof globalThis !== 'undefined') {
     computeProgressPercent: computeProgressPercent,
     selectThresholdForCurrency: selectThresholdForCurrency,
     selectWeightedVariant: selectWeightedVariant,
+    detectDeviceType: detectDeviceType,
+    filterVariantsByDevice: filterVariantsByDevice,
     getCookie: getCookie,
     setCookie: setCookie,
   };

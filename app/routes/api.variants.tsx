@@ -57,6 +57,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             allowedTestModes: limits.allowedTestModes,
             mode: test.mode,
             ...(weights ? { weights } : {}),
+            ...(test.currencyThresholds ? { currencyThresholds: test.currencyThresholds } : {}),
         });
     } catch (error) {
         console.error("Variants API error", {

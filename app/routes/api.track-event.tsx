@@ -28,14 +28,14 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         return new Response("Too Many Requests", { status: 429 });
     }
 
-    let body: { variantId?: unknown; eventType?: unknown };
+    let body: { variantId?: unknown; eventType?: unknown; deviceType?: unknown };
     try {
         body = await request.json();
     } catch {
         return new Response("Invalid JSON", { status: 400 });
     }
 
-    const { variantId, eventType } = body;
+    const { variantId, eventType, deviceType } = body;
 
     if (typeof variantId !== "string" || !VALID_CUID_PATTERN.test(variantId)) {
         return new Response("Invalid variantId", { status: 400 });
@@ -56,10 +56,16 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             return new Response("Invalid variantId", { status: 400 });
         }
 
+        // Validate optional deviceType
+        const validDeviceType = typeof deviceType === "string" && (deviceType === "mobile" || deviceType === "desktop")
+            ? deviceType
+            : undefined;
+
         await db.barEvent.create({
             data: {
                 variantId,
                 eventType,
+                ...(validDeviceType ? { deviceType: validDeviceType } : {}),
             },
         });
 
