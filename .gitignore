@@ -20,6 +20,9 @@ database.sqlite
 *.log
 build_error_*.txt
 
+# Test coverage
+/coverage
+
 
 /extensions/*/dist
 
