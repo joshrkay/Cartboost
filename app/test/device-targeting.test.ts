@@ -11,6 +11,11 @@ Object.defineProperty(globalThis, "window", {
   writable: true,
   configurable: true,
 });
+Object.defineProperty(globalThis, "navigator", {
+  value: { userAgent: "" },
+  writable: true,
+  configurable: true,
+});
 
 // Import the core module (plain JS, not a TS module)
 // @ts-expect-error - cartboost-core.js is a plain script, not a module
@@ -19,17 +24,23 @@ await import("../../extensions/free-shipping-bar/assets/cartboost-core.js");
 const core = (globalThis as any).__cartboostCore;
 
 describe("detectDeviceType", () => {
-  it("returns 'desktop' when window.innerWidth >= 768", () => {
+  beforeEach(() => {
+    // Reset to desktop defaults
+    (globalThis as any).window.innerWidth = 1024;
+    (globalThis as any).navigator.userAgent = "";
+  });
+
+  it("returns 'desktop' when window.innerWidth >= 768 and no mobile UA", () => {
     (globalThis as any).window.innerWidth = 1024;
     expect(core.detectDeviceType()).toBe("desktop");
   });
 
-  it("returns 'desktop' when window.innerWidth === 768", () => {
+  it("returns 'desktop' when window.innerWidth === 768 and no mobile UA", () => {
     (globalThis as any).window.innerWidth = 768;
     expect(core.detectDeviceType()).toBe("desktop");
   });
 
-  it("returns 'mobile' when window.innerWidth < 768", () => {
+  it("returns 'mobile' when window.innerWidth < 768 and no mobile UA", () => {
     (globalThis as any).window.innerWidth = 375;
     expect(core.detectDeviceType()).toBe("mobile");
   });
@@ -37,6 +48,28 @@ describe("detectDeviceType", () => {
   it("returns 'mobile' for very small screens", () => {
     (globalThis as any).window.innerWidth = 320;
     expect(core.detectDeviceType()).toBe("mobile");
+  });
+
+  it("returns 'mobile' for iPhone user agent even with wide viewport", () => {
+    (globalThis as any).navigator.userAgent =
+      "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15";
+    (globalThis as any).window.innerWidth = 1024;
+    expect(core.detectDeviceType()).toBe("mobile");
+  });
+
+  it("returns 'mobile' for Android user agent even with wide viewport", () => {
+    (globalThis as any).navigator.userAgent =
+      "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Mobile Safari/537.36";
+    (globalThis as any).window.innerWidth = 1024;
+    expect(core.detectDeviceType()).toBe("mobile");
+  });
+
+  it("returns 'desktop' for desktop user agent in narrow window", () => {
+    (globalThis as any).navigator.userAgent =
+      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Safari/537.36";
+    (globalThis as any).window.innerWidth = 500;
+    // Desktop UA takes precedence — narrow window should NOT classify as mobile
+    expect(core.detectDeviceType()).toBe("desktop");
   });
 });
 
@@ -86,10 +119,8 @@ describe("filterVariantsByDevice", () => {
 });
 
 describe("track-event deviceType", () => {
-  // This tests the API behavior via the core module's event sending logic
-  // The actual API validation is tested separately in track-event.test.ts
-  // Here we just verify the core functions work correctly with device type
   it("detectDeviceType always returns a valid device string", () => {
+    (globalThis as any).navigator.userAgent = "";
     (globalThis as any).window.innerWidth = 500;
     const type1 = core.detectDeviceType();
     expect(["mobile", "desktop"]).toContain(type1);

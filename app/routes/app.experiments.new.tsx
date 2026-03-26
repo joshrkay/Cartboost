@@ -2,6 +2,7 @@ import type { LoaderFunctionArgs, ActionFunctionArgs } from "react-router";
 import { redirect, useLoaderData, useActionData, Form } from "react-router";
 import { authenticate } from "../shopify.server";
 import { createExperiment, getActiveTest } from "../models/analytics.server";
+import { COMMON_CURRENCIES, DEVICE_OPTIONS, parseDate, validateCurrencyThresholds } from "../utils/experiment-helpers";
 import db from "../db.server";
 import {
   Page,
@@ -67,25 +68,12 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     return { error: "At least one variant is required" };
   }
 
-  // Parse currency thresholds
-  const currencyThresholdsRaw = formData.get("currencyThresholds") as string;
-  let currencyThresholds: Record<string, number> | undefined;
-  if (currencyThresholdsRaw) {
-    try {
-      const parsed = JSON.parse(currencyThresholdsRaw);
-      if (typeof parsed === "object" && parsed !== null && Object.keys(parsed).length > 0) {
-        currencyThresholds = parsed;
-      }
-    } catch {
-      // Invalid JSON, ignore
-    }
-  }
+  // Parse and validate currency thresholds
+  const currencyThresholds = validateCurrencyThresholds(formData.get("currencyThresholds") as string) ?? undefined;
 
-  // Parse scheduled dates
-  const startAtRaw = formData.get("startAt") as string;
-  const endAtRaw = formData.get("endAt") as string;
-  const startAt = startAtRaw ? new Date(startAtRaw) : undefined;
-  const endAt = endAtRaw ? new Date(endAtRaw) : undefined;
+  // Parse and validate scheduled dates
+  const startAt = parseDate(formData.get("startAt") as string);
+  const endAt = parseDate(formData.get("endAt") as string);
 
   if (startAt && endAt && endAt <= startAt) {
     return { error: "End date must be after start date" };
@@ -106,20 +94,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   }
 };
 
-const COMMON_CURRENCIES = [
-  { label: "USD - US Dollar", value: "USD" },
-  { label: "EUR - Euro", value: "EUR" },
-  { label: "GBP - British Pound", value: "GBP" },
-  { label: "CAD - Canadian Dollar", value: "CAD" },
-  { label: "AUD - Australian Dollar", value: "AUD" },
-  { label: "JPY - Japanese Yen", value: "JPY" },
-];
-
-const DEVICE_OPTIONS = [
-  { label: "All Devices", value: "all" },
-  { label: "Mobile Only", value: "mobile" },
-  { label: "Desktop Only", value: "desktop" },
-];
 
 export default function NewExperiment() {
   const { hasActiveTest, activeTestName, maxVariants, plan } = useLoaderData<typeof loader>();

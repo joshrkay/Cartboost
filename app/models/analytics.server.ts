@@ -325,42 +325,64 @@ export async function getABTestStats(
  * Lazy scheduler: check and transition tests based on startAt/endAt.
  * Called before fetching active test to ensure scheduled tests auto-activate
  * and active tests auto-complete.
+ *
+ * Wrapped in a transaction to prevent race conditions where concurrent requests
+ * could both activate different scheduled tests. Throttled to run at most once
+ * per 60 seconds per shop to avoid extra DB queries on every page load.
  */
+const _lastTransitionCheck = new Map<string, number>();
+const TRANSITION_CHECK_INTERVAL_MS = 60_000;
+
+export function resetTransitionThrottle(shop?: string): void {
+  if (shop) {
+    _lastTransitionCheck.delete(shop);
+  } else {
+    _lastTransitionCheck.clear();
+  }
+}
+
 export async function checkAndTransitionTests(shop: string): Promise<void> {
-  const now = new Date();
+  const nowMs = Date.now();
+  const last = _lastTransitionCheck.get(shop) ?? 0;
+  if (nowMs - last < TRANSITION_CHECK_INTERVAL_MS) return;
+  _lastTransitionCheck.set(shop, nowMs);
 
-  // Auto-complete active tests that have passed their endAt
-  await db.aBTest.updateMany({
-    where: {
-      shop,
-      status: "active",
-      endAt: { not: null, lte: now },
-    },
-    data: { status: "completed", completedAt: now },
-  });
+  await db.$transaction(async (tx) => {
+    const now = new Date();
 
-  // Check if there's already an active test before activating a scheduled one
-  const active = await db.aBTest.findFirst({
-    where: { shop, status: "active" },
-  });
-  if (!active) {
-    // Auto-activate scheduled tests that have reached their startAt
-    // Only activate the earliest one to maintain 1-active-at-a-time constraint
-    const readyTest = await db.aBTest.findFirst({
+    // Auto-complete active tests that have passed their endAt
+    await tx.aBTest.updateMany({
       where: {
         shop,
-        status: "scheduled",
-        startAt: { lte: now },
+        status: "active",
+        endAt: { not: null, lte: now },
       },
-      orderBy: { startAt: "asc" },
+      data: { status: "completed", completedAt: now },
     });
-    if (readyTest) {
-      await db.aBTest.update({
-        where: { id: readyTest.id },
-        data: { status: "active" },
+
+    // Check if there's already an active test before activating a scheduled one
+    const active = await tx.aBTest.findFirst({
+      where: { shop, status: "active" },
+    });
+    if (!active) {
+      // Auto-activate scheduled tests that have reached their startAt
+      // Only activate the earliest one to maintain 1-active-at-a-time constraint
+      const readyTest = await tx.aBTest.findFirst({
+        where: {
+          shop,
+          status: "scheduled",
+          startAt: { lte: now },
+        },
+        orderBy: { startAt: "asc" },
       });
+      if (readyTest) {
+        await tx.aBTest.update({
+          where: { id: readyTest.id },
+          data: { status: "active" },
+        });
+      }
     }
-  }
+  });
 }
 
 export async function getActiveTest(shop: string) {

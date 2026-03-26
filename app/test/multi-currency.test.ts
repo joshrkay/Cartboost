@@ -3,13 +3,18 @@ import db from "../db.server";
 import {
   createExperiment,
   updateExperiment,
+  resetTransitionThrottle,
 } from "../models/analytics.server";
 
 const mockDb = db as any;
 const SHOP = "test-shop.myshopify.com";
 
 describe("Multi-Currency Thresholds", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetTransitionThrottle();
+    mockDb.$transaction.mockImplementation((cb: (tx: any) => Promise<any>) => cb(mockDb));
+  });
 
   describe("createExperiment with currencyThresholds", () => {
     it("creates experiment with currency thresholds", async () => {

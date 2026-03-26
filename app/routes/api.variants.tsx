@@ -2,6 +2,7 @@ import type { LoaderFunctionArgs } from "react-router";
 import { authenticate } from "../shopify.server";
 import { getActiveTest, getOrCreateABTest, getVariantWeights } from "../models/analytics.server";
 import { checkRateLimit } from "../utils/rate-limiter.server";
+import { validateCurrencyThresholds } from "../utils/experiment-helpers";
 import db from "../db.server";
 
 /** Plan-specific limits enforced server-side. */
@@ -50,6 +51,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             weights = await getVariantWeights(test.id);
         }
 
+        const validatedThresholds = validateCurrencyThresholds(test.currencyThresholds);
+
         return Response.json({
             variants,
             plan,
@@ -57,7 +60,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             allowedTestModes: limits.allowedTestModes,
             mode: test.mode,
             ...(weights ? { weights } : {}),
-            ...(test.currencyThresholds ? { currencyThresholds: test.currencyThresholds } : {}),
+            ...(validatedThresholds ? { currencyThresholds: validatedThresholds } : {}),
         });
     } catch (error) {
         console.error("Variants API error", {

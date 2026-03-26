@@ -3,13 +3,19 @@ import db from "../db.server";
 import {
   checkAndTransitionTests,
   createExperiment,
+  resetTransitionThrottle,
 } from "../models/analytics.server";
 
 const mockDb = db as any;
 const SHOP = "test-shop.myshopify.com";
 
 describe("checkAndTransitionTests", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetTransitionThrottle();
+    // Mock $transaction to execute the callback with the mock db
+    mockDb.$transaction.mockImplementation((cb: (tx: any) => Promise<any>) => cb(mockDb));
+  });
 
   it("auto-completes active tests past their endAt", async () => {
     mockDb.aBTest.updateMany.mockResolvedValue({ count: 1 });
@@ -17,6 +23,7 @@ describe("checkAndTransitionTests", () => {
 
     await checkAndTransitionTests(SHOP);
 
+    expect(mockDb.$transaction).toHaveBeenCalled();
     expect(mockDb.aBTest.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
@@ -59,18 +66,44 @@ describe("checkAndTransitionTests", () => {
     // Should only call findFirst once (for active check), not a second time for scheduled
     expect(mockDb.aBTest.update).not.toHaveBeenCalled();
   });
+
+  it("skips transition check within throttle window", async () => {
+    mockDb.aBTest.updateMany.mockResolvedValue({ count: 0 });
+    mockDb.aBTest.findFirst.mockResolvedValue(null);
+
+    await checkAndTransitionTests(SHOP);
+    expect(mockDb.$transaction).toHaveBeenCalledTimes(1);
+
+    // Second call within throttle window should be skipped
+    await checkAndTransitionTests(SHOP);
+    expect(mockDb.$transaction).toHaveBeenCalledTimes(1);
+  });
+
+  it("runs transition check after throttle reset", async () => {
+    mockDb.aBTest.updateMany.mockResolvedValue({ count: 0 });
+    mockDb.aBTest.findFirst.mockResolvedValue(null);
+
+    await checkAndTransitionTests(SHOP);
+    expect(mockDb.$transaction).toHaveBeenCalledTimes(1);
+
+    resetTransitionThrottle(SHOP);
+
+    await checkAndTransitionTests(SHOP);
+    expect(mockDb.$transaction).toHaveBeenCalledTimes(2);
+  });
 });
 
 describe("createExperiment with scheduling", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetTransitionThrottle();
+    mockDb.$transaction.mockImplementation((cb: (tx: any) => Promise<any>) => cb(mockDb));
+  });
 
   it("creates a scheduled experiment when startAt is in the future", async () => {
     const futureDate = new Date(Date.now() + 86400000); // tomorrow
     // checkAndTransitionTests mocks
     mockDb.aBTest.updateMany.mockResolvedValue({ count: 0 });
-    // First findFirst: checkAndTransitionTests active check
-    // Second findFirst: checkAndTransitionTests scheduled check (returns null)
-    // Third findFirst: createExperiment's scheduled check
     mockDb.aBTest.findFirst.mockResolvedValue(null);
 
     const mockCreated = {
