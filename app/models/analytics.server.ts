@@ -1,5 +1,5 @@
 import db from "../db.server";
-import type { Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 
 export interface VariantStat {
   id: string;
@@ -207,6 +207,7 @@ interface ABTestWithVariants {
 export async function getABTestStats(
   testIdOrTest: string | ABTestWithVariants,
   dateRange?: DateRange,
+  deviceType?: string,
 ): Promise<VariantStat[]> {
   const test: ABTestWithVariants | null =
     typeof testIdOrTest === "string"
@@ -220,6 +221,7 @@ export async function getABTestStats(
   const dateFilter = dateRange
     ? { createdAt: { gte: dateRange.from, lte: dateRange.to } }
     : {};
+  const deviceFilter = deviceType ? { deviceType } : {};
 
   // Single query for all event counts instead of 2 per variant
   const eventCounts = await db.barEvent.groupBy({
@@ -228,6 +230,7 @@ export async function getABTestStats(
     where: {
       variantId: { in: test.variants.map((v) => v.id) },
       ...dateFilter,
+      ...deviceFilter,
     },
   });
 
@@ -253,6 +256,7 @@ export async function getABTestStats(
       variantId: { in: variantIds },
       eventType: "order_completed",
       ...dateFilter,
+      ...deviceFilter,
     },
   });
   const revenueMap = new Map<string, number>();
@@ -317,7 +321,72 @@ export async function getABTestStats(
 // Experiment CRUD
 // ──────────────────────────────────────────────────────────
 
+/**
+ * Lazy scheduler: check and transition tests based on startAt/endAt.
+ * Called before fetching active test to ensure scheduled tests auto-activate
+ * and active tests auto-complete.
+ *
+ * Wrapped in a transaction to prevent race conditions where concurrent requests
+ * could both activate different scheduled tests. Throttled to run at most once
+ * per 60 seconds per shop to avoid extra DB queries on every page load.
+ */
+const _lastTransitionCheck = new Map<string, number>();
+const TRANSITION_CHECK_INTERVAL_MS = 60_000;
+
+export function resetTransitionThrottle(shop?: string): void {
+  if (shop) {
+    _lastTransitionCheck.delete(shop);
+  } else {
+    _lastTransitionCheck.clear();
+  }
+}
+
+export async function checkAndTransitionTests(shop: string): Promise<void> {
+  const nowMs = Date.now();
+  const last = _lastTransitionCheck.get(shop) ?? 0;
+  if (nowMs - last < TRANSITION_CHECK_INTERVAL_MS) return;
+  _lastTransitionCheck.set(shop, nowMs);
+
+  await db.$transaction(async (tx) => {
+    const now = new Date();
+
+    // Auto-complete active tests that have passed their endAt
+    await tx.aBTest.updateMany({
+      where: {
+        shop,
+        status: "active",
+        endAt: { not: null, lte: now },
+      },
+      data: { status: "completed", completedAt: now },
+    });
+
+    // Check if there's already an active test before activating a scheduled one
+    const active = await tx.aBTest.findFirst({
+      where: { shop, status: "active" },
+    });
+    if (!active) {
+      // Auto-activate scheduled tests that have reached their startAt
+      // Only activate the earliest one to maintain 1-active-at-a-time constraint
+      const readyTest = await tx.aBTest.findFirst({
+        where: {
+          shop,
+          status: "scheduled",
+          startAt: { lte: now },
+        },
+        orderBy: { startAt: "asc" },
+      });
+      if (readyTest) {
+        await tx.aBTest.update({
+          where: { id: readyTest.id },
+          data: { status: "active" },
+        });
+      }
+    }
+  });
+}
+
 export async function getActiveTest(shop: string) {
+  await checkAndTransitionTests(shop);
   return db.aBTest.findFirst({
     where: { shop, status: "active" },
     include: { variants: true },
@@ -333,6 +402,8 @@ export interface ExperimentSummary {
   variantCount: number;
   createdAt: Date;
   completedAt: Date | null;
+  startAt: Date | null;
+  endAt: Date | null;
   totalImpressions: number;
   totalConversions: number;
 }
@@ -364,6 +435,8 @@ export async function listExperiments(shop: string): Promise<ExperimentSummary[]
       variantCount: t.variants.length,
       createdAt: t.createdAt,
       completedAt: t.completedAt,
+      startAt: t.startAt,
+      endAt: t.endAt,
       totalImpressions,
       totalConversions,
     };
@@ -373,14 +446,30 @@ export async function listExperiments(shop: string): Promise<ExperimentSummary[]
 interface CreateExperimentData {
   name: string;
   description?: string;
+  currencyThresholds?: Record<string, number> | null;
+  startAt?: Date;
+  endAt?: Date;
   variants: { name: string; config: Prisma.InputJsonValue }[];
 }
 
 export async function createExperiment(shop: string, data: CreateExperimentData) {
-  // Only 1 active test at a time
-  const active = await getActiveTest(shop);
-  if (active) {
-    throw new Error("An active experiment already exists. Complete or pause it first.");
+  // Determine if this is a scheduled campaign
+  const isScheduled = data.startAt && data.startAt > new Date();
+  const status = isScheduled ? "scheduled" : "active";
+
+  // Only 1 active or scheduled test at a time
+  if (status === "active") {
+    const active = await getActiveTest(shop);
+    if (active) {
+      throw new Error("An active experiment already exists. Complete or pause it first.");
+    }
+  } else {
+    const scheduled = await db.aBTest.findFirst({
+      where: { shop, status: { in: ["active", "scheduled"] } },
+    });
+    if (scheduled) {
+      throw new Error("An active or scheduled experiment already exists. Complete or pause it first.");
+    }
   }
 
   return db.aBTest.create({
@@ -388,6 +477,10 @@ export async function createExperiment(shop: string, data: CreateExperimentData)
       shop,
       name: data.name,
       description: data.description ?? null,
+      status,
+      currencyThresholds: data.currencyThresholds ?? undefined,
+      startAt: data.startAt ?? undefined,
+      endAt: data.endAt ?? undefined,
       variants: {
         create: data.variants.map((v) => ({
           name: v.name,
@@ -401,11 +494,22 @@ export async function createExperiment(shop: string, data: CreateExperimentData)
 
 export async function updateExperiment(
   testId: string,
-  data: { name?: string; description?: string },
+  data: { name?: string; description?: string; currencyThresholds?: Record<string, number> | null; startAt?: Date; endAt?: Date },
 ) {
+  // Prisma requires DbNull for setting JSON fields to null
+  const prismaData: Record<string, unknown> = {};
+  if (data.name !== undefined) prismaData.name = data.name;
+  if (data.description !== undefined) prismaData.description = data.description;
+  if (data.startAt !== undefined) prismaData.startAt = data.startAt;
+  if (data.endAt !== undefined) prismaData.endAt = data.endAt;
+  if (data.currencyThresholds !== undefined) {
+    prismaData.currencyThresholds = data.currencyThresholds === null
+      ? Prisma.DbNull
+      : data.currencyThresholds;
+  }
   return db.aBTest.update({
     where: { id: testId },
-    data,
+    data: prismaData,
     include: { variants: true },
   });
 }
@@ -439,7 +543,7 @@ export async function removeVariant(variantId: string) {
 
 export async function changeTestStatus(
   testId: string,
-  newStatus: "active" | "paused" | "completed",
+  newStatus: "active" | "paused" | "completed" | "scheduled",
   shop: string,
 ) {
   if (newStatus === "active") {

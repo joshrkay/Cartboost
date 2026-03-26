@@ -8,6 +8,7 @@ import {
   changeTestStatus,
   deleteExperiment,
   updateTestMode,
+  resetTransitionThrottle,
 } from "../models/analytics.server";
 
 const mockDb = db as any;
@@ -24,7 +25,12 @@ const MOCK_ACTIVE_TEST = {
 };
 
 describe("getActiveTest", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetTransitionThrottle();
+    mockDb.$transaction.mockImplementation((cb: (tx: any) => Promise<any>) => cb(mockDb));
+    mockDb.aBTest.updateMany.mockResolvedValue({ count: 0 });
+  });
 
   it("returns the active test for a shop", async () => {
     mockDb.aBTest.findFirst.mockResolvedValue(MOCK_ACTIVE_TEST);
@@ -44,7 +50,12 @@ describe("getActiveTest", () => {
 });
 
 describe("createExperiment", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetTransitionThrottle();
+    mockDb.$transaction.mockImplementation((cb: (tx: any) => Promise<any>) => cb(mockDb));
+    mockDb.aBTest.updateMany.mockResolvedValue({ count: 0 });
+  });
 
   it("creates experiment when no active test exists", async () => {
     mockDb.aBTest.findFirst.mockResolvedValue(null);
@@ -118,7 +129,12 @@ describe("updateVariantConfig", () => {
 });
 
 describe("changeTestStatus", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetTransitionThrottle();
+    mockDb.$transaction.mockImplementation((cb: (tx: any) => Promise<any>) => cb(mockDb));
+    mockDb.aBTest.updateMany.mockResolvedValue({ count: 0 });
+  });
 
   it("activates a paused test when no other test is active", async () => {
     mockDb.aBTest.findFirst.mockResolvedValue(null);

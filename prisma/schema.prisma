@@ -37,16 +37,19 @@ model Session {
 }
 
 model ABTest {
-  id          String      @id @default(cuid())
-  shop        String
-  name        String
-  description String?
-  status      String      @default("active") // active, paused, completed
-  mode        String      @default("manual") // "manual" | "auto_optimize"
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
-  completedAt DateTime?
-  variants    ABVariant[]
+  id                 String      @id @default(cuid())
+  shop               String
+  name               String
+  description        String?
+  status             String      @default("active") // active, paused, completed, scheduled
+  mode               String      @default("manual") // "manual" | "auto_optimize"
+  startAt            DateTime?   // When to auto-activate (null = immediate)
+  endAt              DateTime?   // When to auto-complete (null = manual)
+  currencyThresholds Json?       // e.g. {"USD": 50, "EUR": 45, "GBP": 40}
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
+  completedAt        DateTime?
+  variants           ABVariant[]
 
   @@index([shop])
 }
@@ -69,6 +72,7 @@ model BarEvent {
   eventType   String    // "impression", "add_to_cart", or "order_completed"
   revenue     Decimal?  // Only for order_completed events, in shop currency
   currency    String?   // e.g. "USD"
+  deviceType  String?   // "mobile" | "desktop" (null for legacy events)
   createdAt   DateTime  @default(now())
 
   @@index([variantId, eventType])

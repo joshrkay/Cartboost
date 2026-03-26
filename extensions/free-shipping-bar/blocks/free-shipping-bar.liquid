@@ -30,6 +30,7 @@
   var cbActiveVariantId = null;
   var cbVisitorId = null;
   var cbSentEvents = {};
+  var cbDeviceType = detectDeviceType();
 
   function initCartBoostBar() {
     var tier = {{ block.settings.tier | default: "free" | json }};
@@ -108,11 +109,19 @@
     fetch('/apps/cartboost/api/variants')
       .then(function(r) { return r.json(); })
       .then(function(data) {
-        var variants = data.variants || [];
+        var allVariants = data.variants || [];
+        // Filter variants by device type (Premium feature)
+        var variants = filterVariantsByDevice(allVariants, cbDeviceType);
+        if (variants.length === 0) variants = allVariants; // Fallback: show all if none match
         // Server-side plan enforcement: override client tier with server truth
         var serverPlan = data.plan || 'free';
         var serverMaxVariants = data.maxVariants || 1;
         var serverAllowedModes = data.allowedTestModes || ['same_message'];
+
+        // Multi-currency thresholds from server
+        if (data.currencyThresholds) {
+          cbCurrencyThresholds = data.currencyThresholds;
+        }
 
         // Re-apply variant config using server-enforced plan
         var enforcedConfig = selectVariantConfig(
@@ -172,6 +181,7 @@
     var payload = {
       variantId: variantId,
       eventType: eventType,
+      deviceType: cbDeviceType,
     };
     fetch('/apps/cartboost/api/track-event', {
       method: 'POST',
@@ -180,12 +190,21 @@
     }).catch(function(err) { console.error('CartBoost: Tracking failed:', err); });
   }
 
+  // Multi-currency thresholds (populated from server API)
+  var cbCurrencyThresholds = null;
+  var cbDefaultThreshold = {{ block.settings.threshold | default: 50 }};
+
+  function getActiveThreshold() {
+    var activeCurrency = (typeof Shopify !== 'undefined' && Shopify.currency && Shopify.currency.active) ? Shopify.currency.active : null;
+    return selectThresholdForCurrency(cbCurrencyThresholds, activeCurrency, cbDefaultThreshold);
+  }
+
   function updateCartBoostMessage() {
     fetch('/cart.js', { cache: 'default' })
       .then(function(r) { return r.json(); })
       .then(function(cart) {
         var subtotal = cart.total_price / 100;
-        var threshold = {{ block.settings.threshold | default: 50 }};
+        var threshold = getActiveThreshold();
         var msgEl = document.getElementById('cartboost-message');
         msgEl.textContent = computeBarMessage(subtotal, threshold, cbMessageBelow, cbMessageUnlocked);
       });

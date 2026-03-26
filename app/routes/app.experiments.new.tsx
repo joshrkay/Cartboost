@@ -2,6 +2,7 @@ import type { LoaderFunctionArgs, ActionFunctionArgs } from "react-router";
 import { redirect, useLoaderData, useActionData, Form } from "react-router";
 import { authenticate } from "../shopify.server";
 import { createExperiment, getActiveTest } from "../models/analytics.server";
+import { COMMON_CURRENCIES, DEVICE_OPTIONS, parseDate, validateCurrencyThresholds } from "../utils/experiment-helpers";
 import db from "../db.server";
 import {
   Page,
@@ -13,6 +14,7 @@ import {
   Button,
   InlineStack,
   Banner,
+  Select,
 } from "@shopify/polaris";
 import { useState } from "react";
 
@@ -29,6 +31,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const maxVariants = plan === "premium" ? 5 : plan === "pro" ? 3 : 2;
   return {
     shop: session.shop,
+    plan,
     hasActiveTest: !!activeTest,
     activeTestName: activeTest?.name ?? null,
     maxVariants,
@@ -48,12 +51,16 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const variantNames = formData.getAll("variantName") as string[];
   const variantColors = formData.getAll("variantColor") as string[];
   const variantTexts = formData.getAll("variantText") as string[];
+  const variantDeviceTargets = formData.getAll("variantDeviceTarget") as string[];
 
   const variants = variantNames.map((vName, i) => ({
     name: vName,
     config: {
       color: variantColors[i] || "#4CAF50",
       text: variantTexts[i] || "",
+      ...(variantDeviceTargets[i] && variantDeviceTargets[i] !== "all"
+        ? { deviceTarget: variantDeviceTargets[i] }
+        : {}),
     },
   }));
 
@@ -61,10 +68,24 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     return { error: "At least one variant is required" };
   }
 
+  // Parse and validate currency thresholds
+  const currencyThresholds = validateCurrencyThresholds(formData.get("currencyThresholds") as string) ?? undefined;
+
+  // Parse and validate scheduled dates
+  const startAt = parseDate(formData.get("startAt") as string);
+  const endAt = parseDate(formData.get("endAt") as string);
+
+  if (startAt && endAt && endAt <= startAt) {
+    return { error: "End date must be after start date" };
+  }
+
   try {
     const test = await createExperiment(session.shop, {
       name: name.trim(),
       description: description?.trim() || undefined,
+      currencyThresholds,
+      startAt,
+      endAt,
       variants,
     });
     return redirect(`/app/experiments/${test.id}`);
@@ -73,17 +94,21 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   }
 };
 
+
 export default function NewExperiment() {
-  const { hasActiveTest, activeTestName, maxVariants } = useLoaderData<typeof loader>();
+  const { hasActiveTest, activeTestName, maxVariants, plan } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [variants, setVariants] = useState(DEFAULT_VARIANTS.map((v) => ({ ...v })));
+  const [variants, setVariants] = useState(DEFAULT_VARIANTS.map((v) => ({ ...v, deviceTarget: "all" })));
+  const [currencyRows, setCurrencyRows] = useState<{ currency: string; threshold: string }[]>([]);
+  const [startAt, setStartAt] = useState("");
+  const [endAt, setEndAt] = useState("");
 
   const addVariant = () => {
     if (variants.length >= maxVariants) return;
     const letter = String.fromCharCode(65 + variants.length);
-    setVariants([...variants, { name: letter, color: "#666666", text: "" }]);
+    setVariants([...variants, { name: letter, color: "#666666", text: "", deviceTarget: "all" }]);
   };
 
   const removeVariant = (index: number) => {
@@ -91,9 +116,31 @@ export default function NewExperiment() {
     setVariants(variants.filter((_, i) => i !== index));
   };
 
-  const updateVariant = (index: number, field: "color" | "text", value: string) => {
+  const updateVariant = (index: number, field: "color" | "text" | "deviceTarget", value: string) => {
     setVariants(variants.map((v, i) => (i === index ? { ...v, [field]: value } : v)));
   };
+
+  const addCurrencyRow = () => {
+    setCurrencyRows([...currencyRows, { currency: "USD", threshold: "" }]);
+  };
+
+  const removeCurrencyRow = (index: number) => {
+    setCurrencyRows(currencyRows.filter((_, i) => i !== index));
+  };
+
+  const updateCurrencyRow = (index: number, field: "currency" | "threshold", value: string) => {
+    setCurrencyRows(currencyRows.map((r, i) => (i === index ? { ...r, [field]: value } : r)));
+  };
+
+  const currencyThresholdsJson = currencyRows.length > 0
+    ? JSON.stringify(
+        Object.fromEntries(
+          currencyRows
+            .filter((r) => r.threshold && Number(r.threshold) > 0)
+            .map((r) => [r.currency, Number(r.threshold)]),
+        ),
+      )
+    : "";
 
   return (
     <Page title="Create New Experiment" backAction={{ url: "/app/experiments" }}>
@@ -191,6 +238,20 @@ export default function NewExperiment() {
                             autoComplete="off"
                           />
                         </div>
+                        {plan === "premium" && (
+                          <div style={{ flex: "0 0 160px" }}>
+                            <Select
+                              label="Device Target"
+                              name="variantDeviceTarget"
+                              options={DEVICE_OPTIONS}
+                              value={v.deviceTarget}
+                              onChange={(value) => updateVariant(index, "deviceTarget", value)}
+                            />
+                          </div>
+                        )}
+                        {plan !== "premium" && (
+                          <input type="hidden" name="variantDeviceTarget" value="all" />
+                        )}
                       </InlineStack>
                     </BlockStack>
                   </Card>
@@ -198,6 +259,87 @@ export default function NewExperiment() {
               </BlockStack>
             </Card>
           </Layout.Section>
+
+          {plan !== "free" && (
+            <Layout.Section>
+              <Card>
+                <BlockStack gap="400">
+                  <Text variant="headingMd" as="h2">Schedule (Optional)</Text>
+                  <Text variant="bodySm" as="p" tone="subdued">
+                    Set start and end dates to automatically activate and complete this experiment.
+                  </Text>
+                  <InlineStack gap="400" wrap>
+                    <div style={{ flex: 1 }}>
+                      <label>
+                        <Text variant="bodySm" as="span">Start Date</Text>
+                        <input
+                          type="datetime-local"
+                          name="startAt"
+                          value={startAt}
+                          onChange={(e) => setStartAt(e.target.value)}
+                          style={{ display: "block", width: "100%", padding: "8px", borderRadius: 4, border: "1px solid #ccc", marginTop: 4 }}
+                        />
+                      </label>
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <label>
+                        <Text variant="bodySm" as="span">End Date</Text>
+                        <input
+                          type="datetime-local"
+                          name="endAt"
+                          value={endAt}
+                          onChange={(e) => setEndAt(e.target.value)}
+                          style={{ display: "block", width: "100%", padding: "8px", borderRadius: 4, border: "1px solid #ccc", marginTop: 4 }}
+                        />
+                      </label>
+                    </div>
+                  </InlineStack>
+                </BlockStack>
+              </Card>
+            </Layout.Section>
+          )}
+
+          {plan !== "free" && (
+            <Layout.Section>
+              <Card>
+                <BlockStack gap="400">
+                  <InlineStack align="space-between">
+                    <Text variant="headingMd" as="h2">Currency Thresholds (Optional)</Text>
+                    <Button onClick={addCurrencyRow} size="slim">Add Currency</Button>
+                  </InlineStack>
+                  <Text variant="bodySm" as="p" tone="subdued">
+                    Set different free shipping thresholds per currency. The default threshold from theme settings is used as fallback.
+                  </Text>
+                  {currencyRows.map((row, index) => (
+                    <InlineStack key={index} gap="300" blockAlign="end">
+                      <div style={{ flex: "0 0 200px" }}>
+                        <Select
+                          label="Currency"
+                          options={COMMON_CURRENCIES}
+                          value={row.currency}
+                          onChange={(value) => updateCurrencyRow(index, "currency", value)}
+                        />
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <TextField
+                          label="Threshold"
+                          type="number"
+                          value={row.threshold}
+                          onChange={(value) => updateCurrencyRow(index, "threshold", value)}
+                          placeholder="e.g. 50"
+                          autoComplete="off"
+                        />
+                      </div>
+                      <Button tone="critical" variant="plain" onClick={() => removeCurrencyRow(index)} size="slim">
+                        Remove
+                      </Button>
+                    </InlineStack>
+                  ))}
+                  <input type="hidden" name="currencyThresholds" value={currencyThresholdsJson} />
+                </BlockStack>
+              </Card>
+            </Layout.Section>
+          )}
 
           <Layout.Section>
             <InlineStack align="end" gap="200">

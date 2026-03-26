@@ -199,6 +199,45 @@ function selectWeightedVariant(weights, variants) {
   return { index: entries[entries.length - 1].index, variantId: entries[entries.length - 1].id };
 }
 
+/**
+ * Detect the current device type using user-agent (primary) with
+ * screen width as fallback. UA check prevents desktop users in narrow
+ * browser windows from being misclassified as mobile.
+ *
+ * @returns {"mobile" | "desktop"}
+ */
+function detectDeviceType() {
+  if (typeof navigator !== 'undefined' && navigator.userAgent) {
+    if (/Mobi|Android|iPhone|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
+      return 'mobile';
+    }
+    // Non-mobile UA detected — trust it over viewport width
+    // (desktop users in narrow windows should not be classified as mobile)
+    return 'desktop';
+  }
+  // No UA available (e.g. SSR) — fall back to viewport width
+  if (typeof window !== 'undefined' && window.innerWidth < 768) {
+    return 'mobile';
+  }
+  return 'desktop';
+}
+
+/**
+ * Filter variants by device target.
+ * Variants with deviceTarget "all" or undefined/missing are always included.
+ *
+ * @param {Array} variants - Array of { id, name, config: { deviceTarget?: string } }
+ * @param {string} deviceType - "mobile" or "desktop"
+ * @returns {Array} Filtered variants
+ */
+function filterVariantsByDevice(variants, deviceType) {
+  if (!variants || !deviceType) return variants || [];
+  return variants.filter(function(v) {
+    var target = v.config && v.config.deviceTarget;
+    return !target || target === 'all' || target === deviceType;
+  });
+}
+
 // Expose functions on globalThis for both browser and test environments.
 // In the browser, <script> function declarations are already global,
 // but this makes them explicitly available in Node.js/Vitest ESM context too.
@@ -212,6 +251,8 @@ if (typeof globalThis !== 'undefined') {
     computeProgressPercent: computeProgressPercent,
     selectThresholdForCurrency: selectThresholdForCurrency,
     selectWeightedVariant: selectWeightedVariant,
+    detectDeviceType: detectDeviceType,
+    filterVariantsByDevice: filterVariantsByDevice,
     getCookie: getCookie,
     setCookie: setCookie,
   };
