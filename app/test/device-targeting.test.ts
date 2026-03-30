@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { beforeEach, describe, it, expect } from "vitest";
 
 // Mock document.cookie before importing cartboost-core
 Object.defineProperty(globalThis, "document", {
